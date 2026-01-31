@@ -10,7 +10,8 @@ import {
   ArrowRightLeft, 
   CreditCard, 
   BarChart3, 
-  LogOut 
+  LogOut,
+  Bot // <--- IMPORT THIS
 } from 'lucide-react';
 
 const navItems = [
@@ -19,6 +20,7 @@ const navItems = [
   { name: 'Investments', href: '/investments', icon: LineChart },
   { name: 'Transactions', href: '/transactions', icon: ArrowRightLeft },
   { name: 'Cards', href: '/cards', icon: CreditCard },
+  { name: 'FinBot AI', href: '/finbot', icon: Bot }, // <--- NEW ITEM ADDED
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
 ];
 
@@ -27,8 +29,8 @@ export default function Sidebar() {
   const router = useRouter();
 
   const handleLogout = () => {
-    localStorage.removeItem('token'); // Remove the token
-    router.push('/login'); // Redirect to login
+    localStorage.removeItem('token');
+    router.push('/login');
   };
 
   return (
@@ -58,8 +60,7 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Logout Button */}
-      <div onClick={handleLogout} className="nav-item" style={{ marginTop: 'auto', color: 'var(--danger)' }}>
+      <div onClick={handleLogout} className="nav-item" style={{ marginTop: 'auto', color: 'var(--danger)', cursor: 'pointer' }}>
         <LogOut size={20} />
         <span>Logout</span>
       </div>

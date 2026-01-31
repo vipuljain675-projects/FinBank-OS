@@ -7,6 +7,7 @@ import { verifyToken } from '@/lib/auth';
 
 export async function POST(req: Request) {
   try {
+    // --- 1. AUTHENTICATION ---
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     const token = authHeader.split(' ')[1];
@@ -18,7 +19,7 @@ export async function POST(req: Request) {
 
     await connectToDatabase();
 
-    // 1. Gather Data
+    // --- 2. GATHER DATA ---
     const accounts = await Account.find({ userId }).lean();
     const investments = await Investment.find({ userId }).lean();
     const transactions = await Transaction.find({ userId }).sort({ date: -1 }).limit(20).lean();
@@ -28,74 +29,92 @@ export async function POST(req: Request) {
     const netWorth = totalCash + totalInvested;
     const expenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
 
-    // 2. The Prompt
+    // --- 3. SYSTEM PROMPT ---
+// --- 3. CREATE THE PERSONA ---
     const systemPrompt = `
-      You are a sophisticated financial strategist (Hedge Fund Manager Persona). 
+      You are FinBank Pro, a sophisticated hedge fund portfolio manager.
       Your goal is to maximize the user's wealth using data-driven strategies.
 
-      USER DATA:
-      - Net Worth: $${netWorth} (Cash: $${totalCash}, Invested: $${totalInvested})
-      - Recent Spending: $${expenses}
-      - Portfolio: ${investments.map(i => `${i.symbol} (${i.quantity})`).join(', ') || 'Empty'}
+      USER FINANCIAL DATA:
+      - Net Worth: $${netWorth.toLocaleString()} (Cash: $${totalCash.toLocaleString()}, Invested: $${totalInvested.toLocaleString()})
+      - Recent Spending: $${expenses.toLocaleString()}
+      - Current Portfolio: ${investments.map(i => `${i.symbol} (${i.quantity})`).join(', ') || 'None'}
 
       INSTRUCTIONS:
-      1. Analyze the user's position.
-      2. Suggest a specific portfolio allocation.
-      3. CRITICAL: Output the allocation in a MARKDOWN TABLE.
-      4. Keep text brief and strategic.
+      1. Analyze the user's financial position.
+      2. Suggest a specific strategic allocation in DOLLAR AMOUNTS and PERCENTAGES only.
+      3. DO NOT suggest specific "Number of Shares" because you do not have live pricing data.
+      4. ALWAYS output the allocation plan in a Markdown Table with columns: [Asset, Allocation %, Amount ($), Rationale].
+      5. Keep the text brief, professional, and confident.
     `;
-
-    const userPrompt = message || "How do I optimize my portfolio?";
-
-    // 3. HYBRID AI SWITCHER 🔀
-    // If we have a Groq Key, use Groq (Cloud). If not, use Ollama (Local).
-    let aiResponseText = "";
-
+    // --- 4. AI ENGINE (Debugged) ---
+    
+    // STRATEGY A: GROQ CLOUD (Fastest)
     if (process.env.GROQ_API_KEY) {
-      // --- OPTION A: GROQ CLOUD (Deployable) ---
-      console.log("⚡ Using Groq Cloud AI...");
-      const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: "llama3-8b-8192", // Fast Llama 3 model
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt }
-          ],
-          temperature: 0.7
-        })
-      });
+      try {
+        console.log("⚡ Connecting to Groq Cloud...");
+        
+        // Trim key to remove accidental spaces from .env
+        const apiKey = process.env.GROQ_API_KEY.trim();
 
-      if (!groqRes.ok) throw new Error("Groq API Failed");
-      const groqData = await groqRes.json();
-      aiResponseText = groqData.choices[0]?.message?.content || "No advice generated.";
+        const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            // UPDATED MODEL NAME (More stable)
+            model: "llama-3.3-70b-versatile", 
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: String(message || "Financial advice") }
+            ],
+            temperature: 0.5
+          })
+        });
 
-    } else {
-      // --- OPTION B: LOCAL OLLAMA (Dev Mode) ---
-      console.log("🦙 Using Local Ollama...");
-      const ollamaRes = await fetch('http://127.0.0.1:11434/api/generate', {
+        if (!groqRes.ok) {
+          // LOG THE EXACT ERROR FROM GROQ
+          const errorText = await groqRes.text();
+          console.error(`❌ Groq Error Details:`, errorText);
+          throw new Error(`Groq Status: ${groqRes.status}`);
+        }
+
+        const groqData = await groqRes.json();
+        return NextResponse.json({ advice: groqData.choices[0]?.message?.content });
+
+      } catch (error) {
+        console.warn("⚠️ Groq Failed (Check logs above for reason). Switching to Local...");
+      }
+    }
+
+    // STRATEGY B: LOCAL FALLBACK
+    // (Only runs if Groq fails)
+    try {
+      console.log("🧠 Connecting to Local FinBank Brain...");
+      const localResponse = await fetch('http://127.0.0.1:11434/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'llama3.2',
-          prompt: `${systemPrompt}\n\nUSER QUESTION: ${userPrompt}`,
-          stream: false
-        })
+          model: 'finbank',
+          prompt: `${systemPrompt}\n\nUSER: ${message}`,
+          stream: false,
+          options: { num_ctx: 2048 } // Reduce memory usage
+        }),
       });
 
-      if (!ollamaRes.ok) throw new Error("Ollama connection failed.");
-      const ollamaData = await ollamaRes.json();
-      aiResponseText = ollamaData.response;
+      if (localResponse.ok) {
+        const data = await localResponse.json();
+        return NextResponse.json({ advice: data.response });
+      }
+    } catch (e) {
+      console.error("❌ Local Brain also failed.");
     }
 
-    return NextResponse.json({ advice: aiResponseText });
+    return NextResponse.json({ advice: "System: AI services are currently offline. Please check your API Key." });
 
   } catch (error: any) {
-    console.error("AI Error:", error.message);
-    return NextResponse.json({ message: 'AI Service Error', error: error.message }, { status: 500 });
+    return NextResponse.json({ message: 'Server Error', error: error.message }, { status: 500 });
   }
 }
