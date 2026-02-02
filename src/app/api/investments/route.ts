@@ -1,4 +1,3 @@
-// src/app/api/investments/route.ts
 import { NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/db';
 import Investment from '@/lib/models/Investment';
@@ -11,15 +10,11 @@ async function getLivePrice(symbol: string) {
     const apiKey = process.env.FINNHUB_API_KEY;
     if (!apiKey) return null;
 
-    // Fetch from Finnhub
     const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${apiKey}`);
-    
     if (!res.ok) return null;
     
     const data = await res.json();
-    
-    // Finnhub returns 'c' as the Current Price
-    return data.c || null; 
+    return data.c && data.c > 0 ? data.c : null; 
   } catch (error) {
     console.error(`Failed to fetch price for ${symbol}`, error);
     return null;
@@ -39,32 +34,42 @@ export async function GET(req: Request) {
     
     const investments = await Investment.find({ userId: decoded.userId }).sort({ createdAt: -1 });
 
-    // Calculate live values in parallel
     const enrichedInvestments = await Promise.all(investments.map(async (inv) => {
       // 1. Try to get LIVE price
-      let currentPrice = await getLivePrice(inv.symbol);
+      let livePrice = await getLivePrice(inv.symbol);
+      let currentPriceUSD = 0;
 
-      // 2. Fallback: If API fails or limit reached, use the price you bought at (so it doesn't crash)
-      if (!currentPrice) {
-         currentPrice = inv.pricePerShare;
+      // 2. 🧠 SMART LOGIC 🧠
+      if (livePrice) {
+          // CASE A: We got a live price from the API!
+          if (inv.symbol.includes('.NS') || inv.symbol.includes('.BO')) {
+              // API returns INR -> Convert to USD
+              currentPriceUSD = livePrice / 86.5;
+          } else {
+              // API returns USD -> Keep as is
+              currentPriceUSD = livePrice;
+          }
+      } else {
+          // CASE B: API Failed (Market closed or Typo like TSC.NS)
+          // We must use the stored price.
+          // IMPORTANT: The stored price is ALREADY in USD. DO NOT DIVIDE IT.
+          currentPriceUSD = inv.pricePerShare; 
       }
 
       const quantity = Number(inv.quantity);
-      const buyPrice = Number(inv.pricePerShare);
       
-      const currentValue = currentPrice * quantity;
-      const costBasis = buyPrice * quantity;
+      // 3. Calculate Totals (All in USD)
+      const currentValue = currentPriceUSD * quantity;
+      const costBasis = inv.pricePerShare * quantity; 
       
       const gainLoss = currentValue - costBasis;
-      
-      // Prevent division by zero
       const gainLossPercent = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0;
 
       return { 
         ...inv.toObject(), 
-        currentPrice,     
-        currentValue,     
-        gainLoss,         
+        currentPrice: currentPriceUSD, 
+        currentValue, 
+        gainLoss,     
         gainLossPercent   
       };
     }));
@@ -76,7 +81,7 @@ export async function GET(req: Request) {
   }
 }
 
-// POST: Add Investment (Kept same as before)
+// POST: Add Investment (Kept same)
 export async function POST(req: Request) {
   try {
     const authHeader = req.headers.get('Authorization');
@@ -92,19 +97,18 @@ export async function POST(req: Request) {
     
     if (!accountId) return NextResponse.json({ message: 'Select an account' }, { status: 400 });
 
-    const totalCost = Number(quantity) * Number(pricePerShare);
+    const totalCostUSD = Number(quantity) * Number(pricePerShare);
 
     const fundingAccount = await Account.findOne({ _id: accountId, userId: decoded.userId });
-    if (!fundingAccount || fundingAccount.balance < totalCost) {
+    if (!fundingAccount || fundingAccount.balance < totalCostUSD) {
       return NextResponse.json({ message: 'Insufficient funds' }, { status: 400 });
     }
 
-    await Account.findByIdAndUpdate(accountId, { $inc: { balance: -totalCost } });
+    await Account.findByIdAndUpdate(accountId, { $inc: { balance: -totalCostUSD } });
 
-    // Sync to "Investment Portfolio" account for tracking
     await Account.findOneAndUpdate(
       { userId: decoded.userId, name: 'Investment Portfolio' },
-      { $inc: { balance: totalCost } },
+      { $inc: { balance: totalCostUSD } },
       { upsert: true }
     );
 
@@ -114,8 +118,8 @@ export async function POST(req: Request) {
       name,
       type,
       quantity,
-      pricePerShare,
-      totalValue: totalCost 
+      pricePerShare, 
+      totalValue: totalCostUSD 
     });
 
     return NextResponse.json(newInv, { status: 201 });

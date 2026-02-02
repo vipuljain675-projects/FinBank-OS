@@ -15,13 +15,12 @@ export default function InvestmentsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   
-  const { format, currency } = useCurrency(); // 🌍
+  const { format, currency } = useCurrency(); // 🌍 format() handles conversion automatically!
 
   // BUY Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fetchingPrice, setFetchingPrice] = useState(false);
-  const [fetchedCurrency, setFetchedCurrency] = useState('USD'); // Track currency of the stock
   
   // SELL Modal
   const [isSellModalOpen, setIsSellModalOpen] = useState(false);
@@ -32,6 +31,8 @@ export default function InvestmentsPage() {
   const [formData, setFormData] = useState({
     symbol: '', name: '', type: 'Stock', quantity: '', pricePerShare: '', accountId: '' 
   });
+  
+  const [inputCurrency, setInputCurrency] = useState('USD');
 
   useEffect(() => { fetchData(); }, []);
 
@@ -73,7 +74,6 @@ export default function InvestmentsPage() {
     return `https://logo.clearbit.com/${logoSearch.toLowerCase()}.com`;
   };
 
-  // --- SMART PRICE FETCH ---
   const handleSymbolBlur = async () => {
     if (!formData.symbol) return;
     setFetchingPrice(true);
@@ -81,7 +81,6 @@ export default function InvestmentsPage() {
     
     let searchSymbol = formData.symbol.toUpperCase();
 
-    // 🇮🇳 Auto-append .NS if INR is selected and no suffix
     if (currency === 'INR' && formData.type === 'Stock' && !searchSymbol.includes('.') && searchSymbol.length < 5) {
        searchSymbol += '.NS';
        setFormData(prev => ({ ...prev, symbol: searchSymbol }));
@@ -100,8 +99,9 @@ export default function InvestmentsPage() {
              pricePerShare: data.price.toString(),
              name: data.shortName || prev.name 
            }));
-           // 🧠 IMPORTANT: Track if the API returned INR or USD
-           setFetchedCurrency(data.currency || 'USD');
+           
+           if (data.currency === 'INR') setInputCurrency('INR');
+           else setInputCurrency('USD');
         }
       }
     } catch (error) { 
@@ -111,7 +111,6 @@ export default function InvestmentsPage() {
     }
   };
 
-  // --- 🔥 FIXED ADD FUNCTION 🔥 ---
   const handleAddInvestment = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -125,18 +124,10 @@ export default function InvestmentsPage() {
         setIsSubmitting(false);
         return;
     }
-
-    // 🚀 CURRENCY NORMALIZATION FIX 🚀
-    // The backend expects prices in USD.
-    // If the user entered an Indian price (e.g. ₹3000), we must divide by 86.5
-    // before sending, otherwise the backend thinks it's $3000.
     
-    const isIndianStock = formData.symbol.includes('.NS') || formData.symbol.includes('.BO') || fetchedCurrency === 'INR';
-    
-    if (isIndianStock) {
-        // Convert Rupee Price to USD for storage
+    // Explicit Conversion Logic
+    if (inputCurrency === 'INR') {
         finalPrice = finalPrice / 86.5; 
-        console.log(`Converting INR Price ${formData.pricePerShare} to USD ${finalPrice}`);
     }
 
     try {
@@ -146,17 +137,16 @@ export default function InvestmentsPage() {
         body: JSON.stringify({
             ...formData,
             quantity: qty,         
-            pricePerShare: finalPrice // ✅ Send the normalized USD price
+            pricePerShare: finalPrice 
         })
       });
-
-      const data = await res.json();
 
       if (res.ok) {
         setIsModalOpen(false);
         setFormData(prev => ({ ...prev, symbol: '', name: '', type: 'Stock', quantity: '', pricePerShare: '' }));
         fetchData(); 
       } else {
+        const data = await res.json();
         alert(`Failed: ${data.message || 'Unknown Error'}`);
       }
     } catch (error) { 
@@ -185,40 +175,12 @@ export default function InvestmentsPage() {
     finally { setIsSubmitting(false); }
   };
 
-  // --- 🧮 CURRENCY CONVERTER HELPER ---
-  const getConvertedValue = (item: any) => {
-    const val = item.currentValue || 0;
-    
-    // If we are in INR mode, but the stock is likely USD (No .NS/.BO and not Crypto-with-INR-pair)
-    // We assume non-suffixed stocks are USD.
-    if (currency === 'INR') {
-        const isIndianStock = item.symbol.includes('.NS') || item.symbol.includes('.BO');
-        
-        if (!isIndianStock) {
-            return val * 86.5; // 🚀 Convert USD to INR (Approx Rate)
-        }
-    }
-    // If we are in USD mode, but stock is Indian
-    else if (currency === 'USD') {
-        if (item.symbol.includes('.NS') || item.symbol.includes('.BO')) {
-            return val / 86.5; // 🚀 Convert INR to USD
-        }
-    }
-    
-    return val;
-  };
+  // --- 🗑️ REMOVED getConvertedValue() HELPER ---
+  // The global 'format' function already does the math!
 
-  // Recalculate Totals with Conversion
-  const totalPortfolioValue = investments.reduce((sum, item) => sum + getConvertedValue(item), 0);
-  
-  // Estimate Cost Basis (Roughly)
-  const totalCostBasis = investments.reduce((sum, item) => {
-      const cost = (item.pricePerShare * item.quantity);
-      if (currency === 'INR' && !item.symbol.includes('.NS') && !item.symbol.includes('.BO')) return sum + (cost * 86.5);
-      if (currency === 'USD' && (item.symbol.includes('.NS') || item.symbol.includes('.BO'))) return sum + (cost / 86.5);
-      return sum + cost;
-  }, 0);
-
+  // Recalculate Totals (Using raw USD values)
+  const totalPortfolioValue = investments.reduce((sum, item) => sum + (item.currentValue || 0), 0);
+  const totalCostBasis = investments.reduce((sum, item) => sum + (item.pricePerShare * item.quantity), 0);
   const totalGain = totalPortfolioValue - totalCostBasis;
   const totalReturnPercent = totalCostBasis > 0 ? (totalGain / totalCostBasis) * 100 : 0;
 
@@ -246,8 +208,6 @@ export default function InvestmentsPage() {
 
         <div className="space-y-4">
           {investments.map((inv) => {
-            const convertedValue = getConvertedValue(inv); 
-            
             const isPositive = inv.gainLoss >= 0;
             const statusColor = isPositive ? '#10b981' : '#ef4444'; 
             
@@ -268,13 +228,13 @@ export default function InvestmentsPage() {
                 <div className="text-right">
                   <p className="text-gray-500 text-xs uppercase font-semibold mb-1">Holdings</p>
                   <p className="text-gray-400 font-medium text-sm">{inv.quantity} Shares</p>
-                  {/* Show raw price (what you paid) */}
-                  <p className="text-gray-500 text-xs">Cost: {inv.pricePerShare.toLocaleString()} <span className="text-[10px] opacity-70">{inv.symbol.includes('.') ? 'USD' : 'USD'}</span></p>
+                  {/* 🌍 format() handles the USD -> INR conversion automatically */}
+                  <p className="text-gray-500 text-xs">Avg Cost: {format(inv.pricePerShare)}</p>
                 </div>
                 <div className="flex items-center gap-8 text-right">
                   <div>
-                    {/* 🚀 DISPLAY CONVERTED VALUE */}
-                    <p className="text-white font-bold text-xl">{format(convertedValue)}</p>
+                    {/* 🌍 format() handles the USD -> INR conversion automatically */}
+                    <p className="text-white font-bold text-xl">{format(inv.currentValue)}</p>
                     <div className="flex items-center justify-end gap-1 text-xs font-bold" style={{ color: statusColor }}>
                       {isPositive ? '+' : ''}{inv.gainLossPercent?.toFixed(2)}%
                     </div>
@@ -300,8 +260,14 @@ export default function InvestmentsPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div><label className="modal-label">Quantity</label><input type="number" className="modal-input" placeholder="0" value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} required /></div>
                   <div>
-                    <label className="modal-label">Price ({fetchedCurrency})</label>
-                    <input type="number" className="modal-input" placeholder="0.00" value={formData.pricePerShare} onChange={e => setFormData({...formData, pricePerShare: e.target.value})} required />
+                    <label className="modal-label">Price</label>
+                    <div className="flex">
+                        <input type="number" className="modal-input rounded-r-none border-r-0" placeholder="0.00" value={formData.pricePerShare} onChange={e => setFormData({...formData, pricePerShare: e.target.value})} required />
+                        <select className="bg-gray-800 text-white border border-gray-700 rounded-r-xl px-2 text-sm focus:outline-none" value={inputCurrency} onChange={(e) => setInputCurrency(e.target.value)}>
+                           <option value="USD">USD ($)</option>
+                           <option value="INR">INR (₹)</option>
+                        </select>
+                    </div>
                   </div>
                 </div>
                 <button type="submit" className="modal-btn-primary" disabled={isSubmitting}>{isSubmitting ? 'Processing...' : 'Add Investment'}</button>
@@ -315,7 +281,7 @@ export default function InvestmentsPage() {
             <div className="modal-content border" style={{ borderColor: 'rgba(239, 68, 68, 0.3)' }}>
               <div className="modal-header"><h2 className="modal-title" style={{ color: '#ef4444' }}>Sell {sellData.symbol}</h2><button onClick={() => setIsSellModalOpen(false)} className="modal-close"><X size={24}/></button></div>
               <form onSubmit={handleSellInvestment} className="modal-form">
-                <div className="p-4 rounded-xl border mb-2" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.2)' }}><p className="text-sm text-gray-400 mb-1">Current Holdings</p><p className="text-2xl font-bold text-white">{sellData.quantity} Shares</p><p className="text-xs text-gray-500">Value: {format(getConvertedValue(sellData))}</p></div>
+                <div className="p-4 rounded-xl border mb-2" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.2)' }}><p className="text-sm text-gray-400 mb-1">Current Holdings</p><p className="text-2xl font-bold text-white">{sellData.quantity} Shares</p><p className="text-xs text-gray-500">Value: {format(sellData.currentValue || 0)}</p></div>
                 <div><label className="modal-label">Shares to Sell</label><input type="number" className="modal-input" value={sellQuantity} onChange={e => setSellQuantity(e.target.value)} max={sellData.quantity} required /></div>
                 <div><label className="modal-label">Deposit Profit To</label><select className="modal-select text-white" value={depositAccountId} onChange={e => setDepositAccountId(e.target.value)} required>{accounts.map(acc => (<option key={acc._id} value={acc._id}>{acc.name} (Bal: {format(acc.balance)})</option>))}</select></div>
                 <button type="submit" className="w-full text-white font-bold py-3 rounded-xl transition bg-red-500 hover:opacity-90" disabled={isSubmitting}>{isSubmitting ? 'Selling...' : 'Confirm Sell'}</button>
