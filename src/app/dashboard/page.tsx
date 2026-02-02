@@ -2,17 +2,22 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Shell from '@/components/layout/Shell';
 import Link from 'next/link';
+import Shell from '@/components/layout/Shell';
+import SpendingChart from '@/components/charts/SpendingPie'; // Ensure this exists!
 import { 
   Wallet, TrendingUp, ArrowUpRight, ArrowDownLeft, 
-  CreditCard, Plus, Send, Download, Loader2, MoreHorizontal 
+  CreditCard, Plus, Send, Download, Loader2 
 } from 'lucide-react';
+import { useCurrency } from '@/context/CurrencyContext'; // 🌍 Import Currency Hook
 
 export default function Dashboard() {
   const router = useRouter();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  
+  // 🌍 Get the formatter
+  const { format } = useCurrency();
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -42,9 +47,44 @@ export default function Dashboard() {
 
   if (!data) return null;
 
+  // --- 📊 CHART CALCULATION LOGIC ---
+// ... inside Dashboard() ...
+
+  // --- 📊 CHART CALCULATION LOGIC ---
+  let chartData: any[] = [];
+
+  // Plan A: Use API data if available
+  if (data.chartData && data.chartData.length > 0) {
+    chartData = data.chartData.map((item: any) => ({
+      name: item.label,
+      value: item.value, // ✅ Correct
+      color: item.color
+    }));
+  } 
+  
+  // Plan B: Auto-calculate from Recent Transactions
+  if (chartData.length === 0 && data.recentTransactions) {
+    const expenses = data.recentTransactions.filter((t: any) => t.type === 'expense');
+    
+    // Group expenses by Category
+    const grouped = expenses.reduce((acc: any, curr: any) => {
+      const key = curr.category || curr.name || 'Other';
+      if (!acc[key]) acc[key] = 0;
+      acc[key] += Math.abs(curr.amount); 
+      return acc;
+    }, {});
+
+    // 👇 THIS WAS THE ISSUE
+    chartData = Object.keys(grouped).map((key, index) => ({
+      name: key,
+      value: grouped[key], // ✅ FIXED: Changed 'amount' to 'value'
+      color: ['#8b5cf6', '#3b82f6', '#10b981', '#f97316', '#ef4444', '#ec4899'][index % 6]
+    }));
+  }
+  
   return (
     <Shell>
-      <div className="space-y-8">
+      <div className="space-y-8 pb-10">
         
         {/* Header */}
         <div>
@@ -52,12 +92,12 @@ export default function Dashboard() {
           <p className="text-gray-400 text-sm">Here's your financial summary</p>
         </div>
 
-        {/* --- 1. TOP STATS CARDS --- */}
+        {/* --- 1. TOP STATS CARDS (Using format()) --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard title="Total Balance" value={data.totalBalance} icon={Wallet} color="text-white" bgColor="bg-blue-600"/>
-          <StatCard title="Portfolio Value" value={data.portfolioValue} icon={TrendingUp} color="text-green-500" bgColor="bg-green-500/10"/>
-          <StatCard title="Monthly Income" value={data.monthlyIncome} icon={ArrowDownLeft} color="text-blue-400" bgColor="bg-blue-500/10"/>
-          <StatCard title="Monthly Expenses" value={data.monthlyExpenses} icon={ArrowUpRight} color="text-red-400" bgColor="bg-red-500/10"/>
+          <StatCard title="Total Balance" value={format(data.totalBalance)} icon={Wallet} color="text-white" bgColor="bg-blue-600"/>
+          <StatCard title="Portfolio Value" value={format(data.portfolioValue)} icon={TrendingUp} color="text-green-500" bgColor="bg-green-500/10"/>
+          <StatCard title="Monthly Income" value={format(data.monthlyIncome)} icon={ArrowDownLeft} color="text-blue-400" bgColor="bg-blue-500/10"/>
+          <StatCard title="Monthly Expenses" value={format(data.monthlyExpenses)} icon={ArrowUpRight} color="text-red-400" bgColor="bg-red-500/10"/>
         </div>
 
         {/* --- 2. QUICK ACTIONS --- */}
@@ -68,7 +108,7 @@ export default function Dashboard() {
           <QuickAction href="/accounts" icon={Plus} label="Add Account" color="bg-gray-800" />
         </div>
 
-        {/* --- 3. YOUR ACCOUNTS (NEW SECTION) --- */}
+        {/* --- 3. ACCOUNTS GRID (Using format()) --- */}
         <div>
            <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-white">Your Accounts</h3>
@@ -91,11 +131,10 @@ export default function Dashboard() {
                            {acc.type}
                         </span>
                      </div>
-                     
                      <div>
                         <h4 className="text-gray-400 font-medium text-sm mb-1">{acc.name}</h4>
                         <h2 className="text-2xl font-bold text-white mb-1">
-                           ${acc.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                           {format(acc.balance)} {/* 🌍 */}
                         </h2>
                         <p className="text-xs text-gray-600 font-mono">**** {acc._id.slice(-4)}</p>
                      </div>
@@ -109,9 +148,10 @@ export default function Dashboard() {
            </div>
         </div>
 
-        {/* --- 4. MAIN GRID (Transactions & Charts) --- */}
+        {/* --- 4. MAIN GRID (Transactions & Chart) --- */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Recent Transactions List */}
+          
+          {/* Recent Transactions List (Using format()) */}
           <div className="lg:col-span-2 space-y-4">
             <h3 className="text-lg font-bold text-white">Recent Transactions</h3>
             <div className="space-y-3">
@@ -130,7 +170,7 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <span className={`font-bold ${tx.type === 'income' ? 'text-green-500' : 'text-white'}`}>
-                      {tx.type === 'income' ? '+' : '-'}${tx.amount.toLocaleString()}
+                      {tx.type === 'income' ? '+' : '-'}{format(Math.abs(tx.amount))} {/* 🌍 */}
                     </span>
                   </div>
                 ))
@@ -140,27 +180,18 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Spending Chart */}
-          <div className="bg-[#1a1f2e] border border-gray-800 rounded-xl p-6">
-            <h3 className="text-lg font-bold text-white mb-6">Spending by Category</h3>
-            {data.chartData.length > 0 ? (
-              <div className="space-y-4">
-                {data.chartData.map((item: any, idx: number) => (
-                  <div key={idx}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-300">{item.label}</span>
-                      <span className="text-white">${item.value.toLocaleString()}</span>
-                    </div>
-                    <div className="w-full bg-gray-800 rounded-full h-2">
-                      <div className="h-2 rounded-full" style={{ width: `${(item.value / data.monthlyExpenses) * 100}%`, backgroundColor: item.color }}></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="h-40 flex items-center justify-center text-gray-500 text-sm text-center">No spending data to display.</div>
-            )}
+          {/* --- SPENDING CHART --- */}
+          <div className="bg-[#1a1f2e] border border-gray-800 rounded-xl p-6 h-full min-h-[400px]">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-bold text-white">Spending by Category</h3>
+            </div>
+            
+            <div className="h-[300px] w-full">
+               {/* Pass data to the graph component */}
+               <SpendingChart data={chartData} />
+            </div>
           </div>
+
         </div>
       </div>
     </Shell>
@@ -178,7 +209,7 @@ function StatCard({ title, value, icon: Icon, color, bgColor }: any) {
       </div>
       <div>
         <p className="text-gray-400 text-sm font-medium mb-1">{title}</p>
-        <h3 className="text-2xl font-bold text-white">${value.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
+        <h3 className="text-2xl font-bold text-white">{value}</h3>
       </div>
     </div>
   );

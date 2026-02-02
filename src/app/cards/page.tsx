@@ -3,13 +3,18 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Shell from '@/components/layout/Shell';
+import { useCurrency } from '@/context/CurrencyContext'; // 🌍 Import Currency Hook
 import { Plus, Wifi, Lock, Unlock, X, CreditCard, Loader2 } from 'lucide-react';
 
 export default function CardsPage() {
   const router = useRouter();
   const [cards, setCards] = useState<any[]>([]);
-  const [accounts, setAccounts] = useState<any[]>([]); 
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // 🌍 Get the formatter
+  const { format } = useCurrency();
   
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -18,21 +23,41 @@ export default function CardsPage() {
     brand: 'VISA', type: 'virtual', last4: '', expiry: '', monthlyLimit: '', color: 'blue', accountId: '' 
   });
 
-  useEffect(() => { fetchInitialData(); }, []);
+  useEffect(() => { 
+    fetchData(); 
+  }, []);
 
-  const fetchInitialData = async () => {
+  const fetchData = async () => {
     const token = localStorage.getItem('token');
     if (!token) { router.push('/login'); return; }
 
     try {
+      // 1. Fetch Cards
       const cardRes = await fetch('/api/cards', { headers: { 'Authorization': `Bearer ${token}` } });
       if (cardRes.ok) setCards(await cardRes.json());
 
+      // 2. Fetch Accounts (to show "Linked To" names)
       const accRes = await fetch('/api/accounts', { headers: { 'Authorization': `Bearer ${token}` } });
       if (accRes.ok) setAccounts(await accRes.json());
-    } catch (error) { console.error('Fetch error:', error); } 
-    finally { setLoading(false); }
+
+      // 3. Fetch Transactions (ONLY used for math now, not displayed)
+      const dashRes = await fetch('/api/dashboard', { headers: { 'Authorization': `Bearer ${token}` } });
+      if (dashRes.ok) {
+        const dashData = await dashRes.json();
+        setTransactions(dashData.recentTransactions || []);
+      }
+
+    } catch (error) { 
+      console.error('Fetch error:', error); 
+    } finally { 
+      setLoading(false); 
+    }
   };
+
+  // Calculate Total Spent (to update available balance)
+  const totalSpent = transactions
+    .filter((t: any) => t.type === 'expense')
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
   const handleToggleLock = async (cardId: string, currentStatus: string) => {
     const token = localStorage.getItem('token');
@@ -66,7 +91,7 @@ export default function CardsPage() {
       if (res.ok) {
         setShowModal(false);
         setForm({ brand: 'VISA', type: 'virtual', last4: '', expiry: '', monthlyLimit: '', color: 'blue', accountId: '' });
-        fetchInitialData();
+        fetchData();
       } else { alert('Failed to create card'); }
     } catch (error) { alert('Failed to create card.'); } 
     finally { setIsSubmitting(false); }
@@ -76,12 +101,15 @@ export default function CardsPage() {
 
   return (
     <Shell>
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-8 pb-10">
+        
+        {/* Header */}
         <div className="flex justify-between items-center">
            <div><h1 className="text-3xl font-bold text-white mb-1">Cards</h1><p className="text-gray-400 text-sm">Manage your linked debit and credit cards</p></div>
            <button onClick={() => setShowModal(true)} className="bg-purple-600 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-semibold hover:bg-purple-700 transition"><Plus size={18} /> Add Card</button>
         </div>
 
+        {/* --- CARDS GRID --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8">
            {cards.length === 0 ? (
              <div className="col-span-full py-20 flex flex-col items-center justify-center text-gray-500 bg-[#1a1f2e] rounded-2xl border border-gray-800 border-dashed">
@@ -92,6 +120,14 @@ export default function CardsPage() {
                const isActive = card.status === 'Active';
                const isVisa = card.brand === 'VISA';
                const bgStyle = isVisa ? 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)' : 'linear-gradient(135deg, #ea580c 0%, #f97316 100%)';
+               
+               // Dynamic Math: Limit - Spent
+               const availableBalance = Math.max(0, card.monthlyLimit - totalSpent);
+               // Fix 0000 bug
+               const lastFourDigits = card.last4 || (card.cardNumber ? card.cardNumber.slice(-4) : '0000');
+
+               // Get Linked Account Name safely
+               const linkedAccountName = card.accountName || card.accountId?.name || 'Unlinked';
 
                return (
                  <div key={card._id} className="relative group">
@@ -112,7 +148,9 @@ export default function CardsPage() {
 
                         {/* Card Number */}
                         <div className="z-10 mt-2">
-                           <p className="text-white font-mono text-3xl tracking-[0.15em] drop-shadow-md">{card.cardNumber}</p>
+                           <p className="text-white font-mono text-3xl tracking-[0.15em] drop-shadow-md">
+                             **** **** **** {lastFourDigits}
+                           </p>
                         </div>
 
                         {/* Bottom Row */}
@@ -128,20 +166,20 @@ export default function CardsPage() {
                                 <p className="text-white font-mono font-bold">{card.expiry}</p>
                              </div>
                              
+                             {/* LINKED TO */}
                              <div>
                                 <p className="text-white/70 text-[10px] uppercase mb-0.5">Linked To</p>
-                                <p className="text-white font-medium text-sm truncate max-w-[80px]" title={card.accountName || card.accountId?.name}>
-                                  {card.accountName || card.accountId?.name || 'Unlinked'}
+                                <p className="text-white font-medium text-sm truncate max-w-[100px]" title={linkedAccountName}>
+                                  {linkedAccountName}
                                 </p>
                              </div>
 
-                             {/* AVAILABLE BALANCE DISPLAY */}
+                             {/* AVAILABLE BALANCE - 🌍 Dynamic Currency */}
                              <div>
                                 <p className="text-white/70 text-[10px] uppercase mb-0.5">Available</p>
-                                <p className={`font-bold text-lg ${card.remaining < 500 ? 'text-red-300' : 'text-white'}`}>
-                                  ${Number(card.remaining).toLocaleString()}
+                                <p className={`font-bold text-lg ${availableBalance < 500 ? 'text-red-200' : 'text-white'}`}>
+                                  {format(availableBalance)}
                                 </p>
-                                <p className="text-[9px] text-white/60">of ${Number(card.monthlyLimit).toLocaleString()}</p>
                              </div>
                            </div>
                         </div>
@@ -165,7 +203,7 @@ export default function CardsPage() {
            )}
         </div>
 
-        {/* Modal Logic (Keep as is) */}
+        {/* Modal Logic (Unchanged) */}
         {showModal && (
           <div className="modal-overlay">
              <div className="modal-content">
@@ -178,7 +216,8 @@ export default function CardsPage() {
                       <label className="modal-label">Link to Account</label>
                       <select className="modal-select text-white" value={form.accountId} onChange={(e) => setForm({...form, accountId: e.target.value})} required>
                          <option value="" disabled>Select Bank Account</option>
-                         {accounts.map(acc => (<option key={acc._id} value={acc._id}>{acc.name} (${acc.balance.toLocaleString()})</option>))}
+                         {/* 🌍 Dynamic Currency */}
+                         {accounts.map(acc => (<option key={acc._id} value={acc._id}>{acc.name} ({format(acc.balance)})</option>))}
                       </select>
                    </div>
                    <div className="grid grid-cols-2 gap-4">

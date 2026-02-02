@@ -3,11 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Shell from '@/components/layout/Shell';
+import { useCurrency } from '@/context/CurrencyContext'; // 🌍 Import Currency Hook
 import { 
   TrendingUp, 
   TrendingDown, 
   DollarSign, 
-  Loader2 
+  Loader2,
+  Wallet
 } from 'lucide-react';
 
 export default function AnalyticsPage() {
@@ -15,6 +17,9 @@ export default function AnalyticsPage() {
   
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  
+  // 🌍 Get the formatter
+  const { format } = useCurrency();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -77,15 +82,18 @@ export default function AnalyticsPage() {
             icon={TrendingDown} 
             bgColor="bg-red-500/10"
           />
+          
+          {/* Net Savings Card */}
           <div className="bg-[#1a1f2e] border border-gray-800 rounded-2xl p-6">
              <div className="flex justify-between items-start mb-2">
                 <p className="text-gray-400 font-medium text-sm">Net Savings</p>
                 <div className="bg-blue-500/10 p-2 rounded-lg">
-                  <DollarSign className="text-blue-500" size={20}/>
+                  <Wallet className="text-blue-500" size={20}/>
                 </div>
              </div>
              <h2 className="text-3xl font-bold text-blue-500 mb-1">
-               ${data.netSavings?.toLocaleString()}
+               {/* 🌍 Dynamic Currency */}
+               {format(data.netSavings)}
              </h2>
              <p className="text-gray-500 text-xs">
                Savings Rate: <span className="text-white font-bold">{data.savingsRate?.toFixed(1)}%</span>
@@ -146,7 +154,8 @@ export default function AnalyticsPage() {
                    {/* Inner Hole */}
                    <div className="absolute inset-0 m-auto w-32 h-32 bg-[#1a1f2e] rounded-full flex flex-col items-center justify-center shadow-inner">
                       <span className="text-gray-400 text-xs font-medium uppercase tracking-widest">Total</span>
-                      <span className="text-white font-bold text-lg">${data.totalExpenses.toLocaleString()}</span>
+                      {/* 🌍 Dynamic Currency */}
+                      <span className="text-white font-bold text-lg">{format(data.totalExpenses)}</span>
                    </div>
                  </div>
 
@@ -178,6 +187,8 @@ export default function AnalyticsPage() {
 // --- HELPERS ---
 
 function StatCard({ title, amount, color, icon: Icon, bgColor }: any) {
+  const { format } = useCurrency(); // 🌍 Use Hook inside Subcomponent
+  
   return (
     <div className="bg-[#1a1f2e] border border-gray-800 rounded-2xl p-6">
       <div className="flex justify-between items-start mb-2">
@@ -187,7 +198,8 @@ function StatCard({ title, amount, color, icon: Icon, bgColor }: any) {
          </div>
       </div>
       <h2 className={`text-3xl font-bold ${color} mb-1`}>
-        ${amount?.toLocaleString() || 0}
+        {/* 🌍 Format the amount */}
+        {format(amount || 0)}
       </h2>
     </div>
   );
@@ -202,7 +214,7 @@ function generateConicGradient(data: any[]) {
   let gradientString = ''; 
   let currentPercent = 0;
   
-  if (!data) return '#334155 0% 100%'; // Gray fallback
+  if (!data) return '#334155 0% 100%'; 
 
   data.forEach((item, idx) => {
     const end = currentPercent + item.percent;

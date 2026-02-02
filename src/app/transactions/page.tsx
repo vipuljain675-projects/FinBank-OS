@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Shell from '@/components/layout/Shell';
+import { useCurrency } from '@/context/CurrencyContext'; // 🌍 Import Currency Hook
 import { 
   ArrowUpRight, ArrowDownLeft, Search, Plus, X, CreditCard, Landmark, Wallet
 } from 'lucide-react';
@@ -14,6 +15,9 @@ export default function TransactionsPage() {
   const [cards, setCards] = useState<any[]>([]); 
   const [loading, setLoading] = useState(true);
   
+  // 🌍 Get the formatter
+  const { format } = useCurrency();
+
   const [filterType, setFilterType] = useState('All'); 
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -21,10 +25,7 @@ export default function TransactionsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Transaction Mode: 'expense' or 'income'
   const [txType, setTxType] = useState('expense'); 
-  
-  // Payment Method: 'account' or 'card' (Only relevant for expenses)
   const [paymentMethod, setPaymentMethod] = useState('account'); 
 
   const [formData, setFormData] = useState({
@@ -67,12 +68,11 @@ export default function TransactionsPage() {
     setIsSubmitting(true);
     const token = localStorage.getItem('token');
 
-    // Logic: If Income, force 'account' method and clear cardId
     const finalMethod = txType === 'income' ? 'account' : paymentMethod;
     
     const payload = {
       ...formData,
-      type: txType, // 'income' or 'expense'
+      type: txType, 
       accountId: finalMethod === 'account' ? formData.accountId : undefined,
       cardId: finalMethod === 'card' ? formData.cardId : undefined
     };
@@ -153,8 +153,9 @@ export default function TransactionsPage() {
                 </div>
               </div>
               <div className="text-right">
+                {/* 🌍 Dynamic Currency */}
                 <p className={`font-bold ${tx.type === 'income' ? 'text-green-500' : 'text-white'}`}>
-                  {tx.type === 'income' ? '+' : '-'}${Number(tx.amount).toLocaleString(undefined, {minimumFractionDigits: 2})}
+                  {tx.type === 'income' ? '+' : '-'}{format(Math.abs(tx.amount))}
                 </p>
                 <p className="text-[10px] text-gray-500">{new Date(tx.date).toLocaleDateString()}</p>
               </div>
@@ -173,7 +174,6 @@ export default function TransactionsPage() {
 
               <form onSubmit={handleAddTransaction} className="modal-form">
                 
-                {/* 1. Transaction Type Toggle (Income vs Expense) */}
                 <div className="grid grid-cols-2 gap-2 p-1 bg-gray-900 rounded-lg mb-4 border border-gray-800">
                   <button type="button" onClick={() => { setTxType('expense'); setPaymentMethod('account'); }} className={`py-2 text-sm font-bold rounded-md transition ${txType === 'expense' ? 'bg-red-500 text-white' : 'text-gray-400 hover:text-white'}`}>
                     Expense
@@ -183,7 +183,6 @@ export default function TransactionsPage() {
                   </button>
                 </div>
 
-                {/* 2. Payment Method (Only visible for Expenses) */}
                 {txType === 'expense' && (
                   <div className="grid grid-cols-2 gap-2 p-1 bg-gray-800/50 rounded-lg mb-2">
                     <button type="button" onClick={() => setPaymentMethod('account')} className={`py-2 text-sm font-medium rounded-md transition ${paymentMethod === 'account' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}>
@@ -194,16 +193,14 @@ export default function TransactionsPage() {
                     </button>
                   </div>
                 )}
-
-                {/* 3. Logic: If Income OR Bank Transfer -> Show Account Select */}
-                {/* If Card Payment -> Show Card Select */}
                 
                 {(txType === 'income' || paymentMethod === 'account') ? (
                    <div>
                     <label className="modal-label">{txType === 'income' ? 'Deposit To Account' : 'Pay From Account'}</label>
                     <div className="relative">
                       <select className="modal-select text-white pl-10" value={formData.accountId} onChange={e => setFormData({...formData, accountId: e.target.value})} required>
-                        {accounts.map(acc => (<option key={acc._id} value={acc._id}>{acc.name} (${acc.balance.toLocaleString()})</option>))}
+                        {/* 🌍 Dynamic Currency */}
+                        {accounts.map(acc => (<option key={acc._id} value={acc._id}>{acc.name} ({format(acc.balance)})</option>))}
                       </select>
                       <Landmark className="absolute left-3 top-3 text-gray-400" size={18}/>
                     </div>

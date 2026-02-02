@@ -1,9 +1,9 @@
-// src/app/accounts/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Shell from '@/components/layout/Shell';
+import { useCurrency } from '@/context/CurrencyContext'; // 🌍 Import Currency Hook
 import { Plus, Wallet, Loader2, Trash2 } from 'lucide-react';
 
 export default function AccountsPage() {
@@ -11,6 +11,9 @@ export default function AccountsPage() {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
+  // 🌍 Get the formatter
+  const { format } = useCurrency();
+
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -60,7 +63,6 @@ export default function AccountsPage() {
         setNewAccount({ name: '', type: 'Checking', balance: '' });
         fetchAccounts();
       } else {
-        // --- ERROR ALERT ---
         alert(`Failed to create account: ${data.message || 'Unknown Error'}`);
       }
     } catch (error) {
@@ -141,7 +143,8 @@ export default function AccountsPage() {
             <span className="text-gray-400 font-medium">Net Worth</span>
           </div>
           <h2 className="text-4xl font-bold text-white tracking-tight">
-            ${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            {/* 🌍 Dynamic Currency */}
+            {format(totalBalance)}
           </h2>
         </div>
 
@@ -160,7 +163,8 @@ export default function AccountsPage() {
                   </div>
                 </div>
                 <p className="text-3xl font-bold text-white mb-1">
-                  ${acc.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  {/* 🌍 Dynamic Currency */}
+                  {format(acc.balance)}
                 </p>
                 <p className="text-xs text-gray-500 font-mono">**** {acc._id.slice(-4)}</p>
               </div>
