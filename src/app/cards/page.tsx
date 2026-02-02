@@ -13,8 +13,8 @@ export default function CardsPage() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // 🌍 Get the formatter
-  const { format } = useCurrency();
+  // 🌍 Get the formatter AND currency state
+  const { format, currency } = useCurrency();
   
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -75,26 +75,48 @@ export default function CardsPage() {
     }
   };
 
+  // --- 🔥 FIXED SUBMIT FUNCTION 🔥 ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     const token = localStorage.getItem('token');
+
+    let finalLimit = Number(form.monthlyLimit);
+
+    // 🚀 CURRENCY FIX: Convert INR input to USD for backend storage
+    if (currency === 'INR') {
+        console.log(`Converting Limit ₹${finalLimit} to USD...`);
+        finalLimit = finalLimit / 86.5; 
+    }
+
     try {
       const res = await fetch('/api/cards', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          brand: form.brand, type: form.type, last4: form.last4, expiry: form.expiry,
-          monthlyLimit: Number(form.monthlyLimit), color: form.brand === 'MASTERCARD' ? 'orange' : 'blue', accountId: form.accountId
+          brand: form.brand, 
+          type: form.type, 
+          last4: form.last4, 
+          expiry: form.expiry,
+          monthlyLimit: finalLimit, // ✅ Send the converted USD value
+          color: form.brand === 'MASTERCARD' ? 'orange' : 'blue', 
+          accountId: form.accountId
         })
       });
+
       if (res.ok) {
         setShowModal(false);
         setForm({ brand: 'VISA', type: 'virtual', last4: '', expiry: '', monthlyLimit: '', color: 'blue', accountId: '' });
         fetchData();
-      } else { alert('Failed to create card'); }
-    } catch (error) { alert('Failed to create card.'); } 
-    finally { setIsSubmitting(false); }
+      } else { 
+        alert('Failed to create card'); 
+      }
+    } catch (error) { 
+        alert('Failed to create card.'); 
+    } 
+    finally { 
+        setIsSubmitting(false); 
+    }
   };
 
   if (loading) return <Shell><div className="flex h-full items-center justify-center text-white"><Loader2 className="animate-spin mr-2"/> Loading Cards...</div></Shell>;
@@ -203,7 +225,7 @@ export default function CardsPage() {
            )}
         </div>
 
-        {/* Modal Logic (Unchanged) */}
+        {/* Modal Logic */}
         {showModal && (
           <div className="modal-overlay">
              <div className="modal-content">
@@ -247,7 +269,7 @@ export default function CardsPage() {
                       </div>
                    </div>
                    <div>
-                      <label className="modal-label">Monthly Limit</label>
+                      <label className="modal-label">Monthly Limit ({currency})</label>
                       <input type="number" className="modal-input" placeholder="5000" value={form.monthlyLimit} onChange={(e) => setForm({...form, monthlyLimit: e.target.value})} required />
                    </div>
                    <button type="submit" className="modal-btn-primary" disabled={isSubmitting}>{isSubmitting ? 'Processing...' : 'Issue Card'}</button>

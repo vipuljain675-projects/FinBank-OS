@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Shell from '@/components/layout/Shell';
 import { useCurrency } from '@/context/CurrencyContext'; // 🌍 Import Currency Hook
 import { 
-  ArrowUpRight, ArrowDownLeft, Search, Plus, X, CreditCard, Landmark, Wallet
+  ArrowUpRight, ArrowDownLeft, Search, Plus, X, CreditCard, Landmark
 } from 'lucide-react';
 
 export default function TransactionsPage() {
@@ -15,8 +15,8 @@ export default function TransactionsPage() {
   const [cards, setCards] = useState<any[]>([]); 
   const [loading, setLoading] = useState(true);
   
-  // 🌍 Get the formatter
-  const { format } = useCurrency();
+  // 🌍 Get the formatter and currency state
+  const { format, currency } = useCurrency();
 
   const [filterType, setFilterType] = useState('All'); 
   const [searchQuery, setSearchQuery] = useState('');
@@ -63,15 +63,26 @@ export default function TransactionsPage() {
     finally { setLoading(false); }
   };
 
+  // --- 🔥 FIXED ADD FUNCTION (PRESERVING YOUR FEATURES) 🔥 ---
   const handleAddTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     const token = localStorage.getItem('token');
 
+    // 1. Determine Payment Method (Account vs Card)
     const finalMethod = txType === 'income' ? 'account' : paymentMethod;
     
+    // 2. 🚀 CURRENCY FIX: Convert INR input to USD for backend
+    let finalAmount = parseFloat(formData.amount);
+    if (currency === 'INR') {
+        // If user types ₹1,00,000, convert to ~$1156 USD
+        finalAmount = finalAmount / 86.5; 
+    }
+
+    // 3. Construct Payload
     const payload = {
       ...formData,
+      amount: finalAmount, // ✅ Send converted amount
       type: txType, 
       accountId: finalMethod === 'account' ? formData.accountId : undefined,
       cardId: finalMethod === 'card' ? formData.cardId : undefined
@@ -88,6 +99,7 @@ export default function TransactionsPage() {
 
       if (res.ok) {
         setIsModalOpen(false);
+        // Reset form but keep IDs valid if possible
         setFormData(prev => ({ ...prev, name: '', amount: '' }));
         fetchData();
       } else {
@@ -112,7 +124,7 @@ export default function TransactionsPage() {
 
   return (
     <Shell>
-      <div className="space-y-6 relative">
+      <div className="space-y-6 relative pb-32">
         <div className="flex justify-between items-end">
           <div><h1 className="text-2xl font-bold text-white mb-1">Transactions</h1><p className="text-gray-400 text-sm">View and manage all transactions</p></div>
           <button onClick={() => setIsModalOpen(true)} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2"><Plus size={16} /> Add Transaction</button>
@@ -133,7 +145,7 @@ export default function TransactionsPage() {
 
         {/* Transactions List */}
         <div className="space-y-3">
-          {filteredTransactions.map((tx) => (
+          {filteredTransactions.length > 0 ? filteredTransactions.map((tx) => (
             <div key={tx._id} className="bg-[#1a1f2e] border border-gray-800 rounded-xl p-4 flex items-center justify-between hover:border-gray-600 transition">
               <div className="flex items-center gap-4">
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tx.type === 'income' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
@@ -160,7 +172,9 @@ export default function TransactionsPage() {
                 <p className="text-[10px] text-gray-500">{new Date(tx.date).toLocaleDateString()}</p>
               </div>
             </div>
-          ))}
+          )) : (
+             <div className="text-center py-10 text-gray-500">No transactions found.</div>
+          )}
         </div>
 
         {/* --- ADD TRANSACTION MODAL --- */}
@@ -174,6 +188,7 @@ export default function TransactionsPage() {
 
               <form onSubmit={handleAddTransaction} className="modal-form">
                 
+                {/* Income / Expense Switch */}
                 <div className="grid grid-cols-2 gap-2 p-1 bg-gray-900 rounded-lg mb-4 border border-gray-800">
                   <button type="button" onClick={() => { setTxType('expense'); setPaymentMethod('account'); }} className={`py-2 text-sm font-bold rounded-md transition ${txType === 'expense' ? 'bg-red-500 text-white' : 'text-gray-400 hover:text-white'}`}>
                     Expense
@@ -183,6 +198,7 @@ export default function TransactionsPage() {
                   </button>
                 </div>
 
+                {/* Payment Method Switch (Only for Expense) */}
                 {txType === 'expense' && (
                   <div className="grid grid-cols-2 gap-2 p-1 bg-gray-800/50 rounded-lg mb-2">
                     <button type="button" onClick={() => setPaymentMethod('account')} className={`py-2 text-sm font-medium rounded-md transition ${paymentMethod === 'account' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}>
@@ -199,7 +215,7 @@ export default function TransactionsPage() {
                     <label className="modal-label">{txType === 'income' ? 'Deposit To Account' : 'Pay From Account'}</label>
                     <div className="relative">
                       <select className="modal-select text-white pl-10" value={formData.accountId} onChange={e => setFormData({...formData, accountId: e.target.value})} required>
-                        {/* 🌍 Dynamic Currency */}
+                        {/* 🌍 Dynamic Currency in Dropdown */}
                         {accounts.map(acc => (<option key={acc._id} value={acc._id}>{acc.name} ({format(acc.balance)})</option>))}
                       </select>
                       <Landmark className="absolute left-3 top-3 text-gray-400" size={18}/>
@@ -224,7 +240,8 @@ export default function TransactionsPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="modal-label">Amount</label>
+                    {/* Display current selected currency label */}
+                    <label className="modal-label">Amount ({currency})</label>
                     <input type="number" className="modal-input" placeholder="0.00" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} required/>
                   </div>
                   <div>

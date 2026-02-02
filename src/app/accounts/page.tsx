@@ -11,8 +11,8 @@ export default function AccountsPage() {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // 🌍 Get the formatter
-  const { format } = useCurrency();
+  // 🌍 Get the formatter AND currency state
+  const { format, currency } = useCurrency();
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -41,10 +41,19 @@ export default function AccountsPage() {
     }
   };
 
+  // --- 🔥 FIXED ADD ACCOUNT FUNCTION 🔥 ---
   const handleAddAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     const token = localStorage.getItem('token');
+
+    let finalBalance = parseFloat(newAccount.balance);
+
+    // 🚀 CURRENCY FIX: Convert INR input to USD for backend storage
+    if (currency === 'INR') {
+        console.log(`Converting ₹${finalBalance} to USD...`);
+        finalBalance = finalBalance / 86.5; 
+    }
 
     try {
       const res = await fetch('/api/accounts', {
@@ -53,7 +62,10 @@ export default function AccountsPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(newAccount)
+        body: JSON.stringify({
+            ...newAccount,
+            balance: finalBalance // ✅ Send the converted USD value
+        })
       });
 
       const data = await res.json();
@@ -104,7 +116,7 @@ export default function AccountsPage() {
 
   return (
     <Shell>
-      <div className="space-y-8">
+      <div className="space-y-8 pb-32">
         
         {/* Header */}
         <div className="flex justify-between items-end">
@@ -206,7 +218,7 @@ export default function AccountsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="modal-label">Initial Balance</label>
+                  <label className="modal-label">Initial Balance ({currency})</label>
                   <input type="number" className="modal-input" placeholder="0.00" value={newAccount.balance} onChange={e => setNewAccount({...newAccount, balance: e.target.value})} required />
                 </div>
                 <button type="submit" className="modal-btn-primary" disabled={isSubmitting}>{isSubmitting ? 'Creating...' : 'Create Account'}</button>
