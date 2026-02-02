@@ -15,7 +15,7 @@ export default function InvestmentsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   
-  const { format, currency } = useCurrency(); // 🌍
+  const { format, currency } = useCurrency();
 
   // BUY Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -72,9 +72,7 @@ export default function InvestmentsPage() {
     return `https://logo.clearbit.com/${logoSearch.toLowerCase()}.com`;
   };
 
-  // --- 🧠 SMART PRICE FETCH LOGIC ---
- // ... inside InvestmentsPage ...
-
+  // --- SMART GOOGLE FINANCE FETCH ---
   const handleSymbolBlur = async () => {
     if (!formData.symbol) return;
     setFetchingPrice(true);
@@ -82,11 +80,8 @@ export default function InvestmentsPage() {
     
     let searchSymbol = formData.symbol.toUpperCase();
 
-    // 🇮🇳 Auto-append .NS if INR is selected and no suffix provided
-    // This maps 'TCS' -> 'TCS.NS' so the backend knows to look in NSE
+    // 🇮🇳 Auto-append .NS for India
     if (currency === 'INR' && formData.type === 'Stock' && !searchSymbol.includes('.')) {
-       // Check if it's NOT a US stock (simple check: length > 4 usually implies US ticker, but Indian tickers can be short too)
-       // Let's just assume if INR mode is on, they want Indian stocks mostly.
        searchSymbol += '.NS';
        setFormData(prev => ({ ...prev, symbol: searchSymbol }));
     }
@@ -113,22 +108,48 @@ export default function InvestmentsPage() {
     }
   };
 
+  // --- 🔥 FIXED ADD FUNCTION 🔥 ---
   const handleAddInvestment = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     const token = localStorage.getItem('token');
+
+    // 1. Convert Strings to Numbers
+    const qty = Number(formData.quantity);
+    const price = Number(formData.pricePerShare);
+
+    // 2. Validation
+    if (qty <= 0 || price < 0) {
+        alert("Invalid Quantity or Price");
+        setIsSubmitting(false);
+        return;
+    }
+
     try {
       const res = await fetch('/api/investments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+            ...formData,
+            quantity: qty,         // ✅ Send as Number
+            pricePerShare: price   // ✅ Send as Number
+        })
       });
+
+      const data = await res.json();
+
       if (res.ok) {
         setIsModalOpen(false);
         setFormData(prev => ({ ...prev, symbol: '', name: '', type: 'Stock', quantity: '', pricePerShare: '' }));
         fetchData(); 
+      } else {
+        // Show Real Error (e.g., "Insufficient Funds")
+        alert(`Failed: ${data.message || 'Unknown Error'}`);
       }
-    } catch (error) { alert("Error"); } 
+    } catch (error) { 
+        console.error(error);
+        alert("Network Error"); 
+    } 
     finally { setIsSubmitting(false); }
   };
 
