@@ -400,7 +400,9 @@ input, select { font-family: inherit; }
 .hero-title {
   font-size: 3.5rem; line-height: 1.1; font-weight: 800; margin-bottom: 1.5rem;
   background: linear-gradient(to bottom, #ffffff 0%, #9ca3af 100%);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   z-index: 1;
 }
 .hero-subtitle {
