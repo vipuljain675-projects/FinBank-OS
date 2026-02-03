@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/db';
 import Card from '@/lib/models/Card';
-import Transaction from '@/lib/models/Transaction'; // Import Transaction model
+import Transaction from '@/lib/models/Transaction';
 import { verifyToken } from '@/lib/auth';
 
 export async function GET(req: Request) {
@@ -12,7 +12,6 @@ export async function GET(req: Request) {
     const token = authHeader.split(' ')[1];
     const decoded = verifyToken(token);
     
-    // FIX: TypeScript Null Check
     if (!decoded || typeof decoded !== 'object' || !(decoded as any).userId) {
       return NextResponse.json({ message: 'Invalid Token' }, { status: 401 });
     }
@@ -32,22 +31,22 @@ export async function GET(req: Request) {
 
     const transactions = await Transaction.find({
       userId,
-      cardId: { $in: cards.map((c: any) => c._id) }, // Only fetch txs for these cards
+      cardId: { $in: cards.map((c: any) => c._id) }, // ✅ Only fetch txs explicitly linked to these cards
       date: { $gte: startOfMonth }
     }).lean();
 
-    // 3. Calculate "Spent" and "Remaining"
+    // 3. Calculate "Spent" and "Remaining" per card
     const enhancedCards = cards.map((card: any) => {
-      // Sum up transactions for this specific card
+      // Filter transactions for THIS specific card
       const spentThisMonth = transactions
-        .filter((t: any) => t.cardId.toString() === card._id.toString())
-        .reduce((sum: number, t: any) => sum + t.amount, 0);
+        .filter((t: any) => t.cardId && t.cardId.toString() === card._id.toString())
+        .reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0); // ✅ Sum absolute amounts
 
       return {
         ...card,
         accountName: card.accountId ? card.accountId.name : 'Unlinked',
         spent: spentThisMonth,
-        remaining: card.monthlyLimit - spentThisMonth // Calculated Field
+        remaining: Math.max(0, card.monthlyLimit - spentThisMonth) // ✅ Correct Math
       };
     });
     

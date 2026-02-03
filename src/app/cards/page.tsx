@@ -3,17 +3,15 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Shell from '@/components/layout/Shell';
-import { useCurrency } from '@/context/CurrencyContext'; // 🌍 Import Currency Hook
+import { useCurrency } from '@/context/CurrencyContext'; 
 import { Plus, Wifi, Lock, Unlock, X, CreditCard, Loader2 } from 'lucide-react';
 
 export default function CardsPage() {
   const router = useRouter();
   const [cards, setCards] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
-  const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // 🌍 Get the formatter AND currency state
   const { format, currency } = useCurrency();
   
   const [showModal, setShowModal] = useState(false);
@@ -32,20 +30,13 @@ export default function CardsPage() {
     if (!token) { router.push('/login'); return; }
 
     try {
-      // 1. Fetch Cards
+      // 1. Fetch Cards (Now includes pre-calculated 'remaining' and 'spent')
       const cardRes = await fetch('/api/cards', { headers: { 'Authorization': `Bearer ${token}` } });
       if (cardRes.ok) setCards(await cardRes.json());
 
-      // 2. Fetch Accounts (to show "Linked To" names)
+      // 2. Fetch Accounts (For the dropdown)
       const accRes = await fetch('/api/accounts', { headers: { 'Authorization': `Bearer ${token}` } });
       if (accRes.ok) setAccounts(await accRes.json());
-
-      // 3. Fetch Transactions (ONLY used for math now, not displayed)
-      const dashRes = await fetch('/api/dashboard', { headers: { 'Authorization': `Bearer ${token}` } });
-      if (dashRes.ok) {
-        const dashData = await dashRes.json();
-        setTransactions(dashData.recentTransactions || []);
-      }
 
     } catch (error) { 
       console.error('Fetch error:', error); 
@@ -53,11 +44,6 @@ export default function CardsPage() {
       setLoading(false); 
     }
   };
-
-  // Calculate Total Spent (to update available balance)
-  const totalSpent = transactions
-    .filter((t: any) => t.type === 'expense')
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
   const handleToggleLock = async (cardId: string, currentStatus: string) => {
     const token = localStorage.getItem('token');
@@ -75,17 +61,13 @@ export default function CardsPage() {
     }
   };
 
-  // --- 🔥 FIXED SUBMIT FUNCTION 🔥 ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     const token = localStorage.getItem('token');
 
     let finalLimit = Number(form.monthlyLimit);
-
-    // 🚀 CURRENCY FIX: Convert INR input to USD for backend storage
     if (currency === 'INR') {
-        console.log(`Converting Limit ₹${finalLimit} to USD...`);
         finalLimit = finalLimit / 86.5; 
     }
 
@@ -98,7 +80,7 @@ export default function CardsPage() {
           type: form.type, 
           last4: form.last4, 
           expiry: form.expiry,
-          monthlyLimit: finalLimit, // ✅ Send the converted USD value
+          monthlyLimit: finalLimit,
           color: form.brand === 'MASTERCARD' ? 'orange' : 'blue', 
           accountId: form.accountId
         })
@@ -125,13 +107,11 @@ export default function CardsPage() {
     <Shell>
       <div className="flex flex-col gap-8 pb-10">
         
-        {/* Header */}
         <div className="flex justify-between items-center">
            <div><h1 className="text-3xl font-bold text-white mb-1">Cards</h1><p className="text-gray-400 text-sm">Manage your linked debit and credit cards</p></div>
            <button onClick={() => setShowModal(true)} className="bg-purple-600 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-semibold hover:bg-purple-700 transition"><Plus size={18} /> Add Card</button>
         </div>
 
-        {/* --- CARDS GRID --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8">
            {cards.length === 0 ? (
              <div className="col-span-full py-20 flex flex-col items-center justify-center text-gray-500 bg-[#1a1f2e] rounded-2xl border border-gray-800 border-dashed">
@@ -143,13 +123,10 @@ export default function CardsPage() {
                const isVisa = card.brand === 'VISA';
                const bgStyle = isVisa ? 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)' : 'linear-gradient(135deg, #ea580c 0%, #f97316 100%)';
                
-               // Dynamic Math: Limit - Spent
-               const availableBalance = Math.max(0, card.monthlyLimit - totalSpent);
-               // Fix 0000 bug
+               // ✅ FIX: Use Backend's Calculated Remaining Balance
+               const availableBalance = card.remaining; 
                const lastFourDigits = card.last4 || (card.cardNumber ? card.cardNumber.slice(-4) : '0000');
-
-               // Get Linked Account Name safely
-               const linkedAccountName = card.accountName || card.accountId?.name || 'Unlinked';
+               const linkedAccountName = card.accountName || 'Unlinked';
 
                return (
                  <div key={card._id} className="relative group">
@@ -188,7 +165,6 @@ export default function CardsPage() {
                                 <p className="text-white font-mono font-bold">{card.expiry}</p>
                              </div>
                              
-                             {/* LINKED TO */}
                              <div>
                                 <p className="text-white/70 text-[10px] uppercase mb-0.5">Linked To</p>
                                 <p className="text-white font-medium text-sm truncate max-w-[100px]" title={linkedAccountName}>
@@ -196,7 +172,6 @@ export default function CardsPage() {
                                 </p>
                              </div>
 
-                             {/* AVAILABLE BALANCE - 🌍 Dynamic Currency */}
                              <div>
                                 <p className="text-white/70 text-[10px] uppercase mb-0.5">Available</p>
                                 <p className={`font-bold text-lg ${availableBalance < 500 ? 'text-red-200' : 'text-white'}`}>
@@ -238,7 +213,6 @@ export default function CardsPage() {
                       <label className="modal-label">Link to Account</label>
                       <select className="modal-select text-white" value={form.accountId} onChange={(e) => setForm({...form, accountId: e.target.value})} required>
                          <option value="" disabled>Select Bank Account</option>
-                         {/* 🌍 Dynamic Currency */}
                          {accounts.map(acc => (<option key={acc._id} value={acc._id}>{acc.name} ({format(acc.balance)})</option>))}
                       </select>
                    </div>

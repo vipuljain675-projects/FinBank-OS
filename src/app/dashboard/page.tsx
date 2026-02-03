@@ -1,55 +1,80 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Shell from '@/components/layout/Shell';
 import SpendingBarChart from '@/components/charts/SpendingBarChart';
+import { useQuery } from '@tanstack/react-query'; 
+import { useGSAP } from '@gsap/react'; 
+import gsap from 'gsap';
 import { 
   Wallet, TrendingUp, ArrowUpRight, ArrowDownLeft, 
   CreditCard, Plus, Send, Download, Loader2 
 } from 'lucide-react';
 import { useCurrency } from '@/context/CurrencyContext';
 
+const fetchDashboard = async () => {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error("No token");
+  const res = await fetch('/api/dashboard', { 
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!res.ok) throw new Error("Failed to fetch");
+  return res.json();
+};
+
 export default function Dashboard() {
   const router = useRouter();
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const { format } = useCurrency();
+  const containerRef = useRef(null);
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      const token = localStorage.getItem('token');
-      if (!token) { router.push('/login'); return; }
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['dashboardData'],
+    queryFn: fetchDashboard,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+  });
 
-      try {
-        const res = await fetch('/api/dashboard', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok) {
-          setData(await res.json());
-        }
-      } catch (error) {
-        console.error("Failed to load dashboard", error);
-      } finally {
-        setLoading(false);
+  // ✅ FIXED: Proper GSAP animation that runs AFTER data loads
+  useGSAP(() => {
+    if (!data || isLoading) return;
+    
+    // Animate all cards in sequence
+    gsap.fromTo('.animate-card', 
+      {
+        y: 30,
+        opacity: 0,
+      },
+      {
+        y: 0,
+        opacity: 1,
+        duration: 0.6,
+        stagger: 0.08,
+        ease: 'power3.out',
+        clearProps: 'all', // Clear inline styles after animation
       }
-    };
+    );
+  }, { scope: containerRef, dependencies: [data, isLoading] });
 
-    fetchDashboardData();
-  }, [router]);
+  if (isError) {
+    router.push('/login');
+    return null;
+  }
 
-  if (loading) return (
-    <Shell>
-      <div className="flex items-center justify-center h-full text-white">
-        <Loader2 className="animate-spin mr-2" /> Loading Dashboard...
-      </div>
-    </Shell>
-  );
+  if (isLoading) {
+    return (
+      <Shell>
+        <div className="flex items-center justify-center h-full text-white">
+          <Loader2 className="animate-spin mr-2" /> Loading Dashboard...
+        </div>
+      </Shell>
+    );
+  }
 
   if (!data) return null;
 
-  // Prepare chart data
+  // ✅ Chart Data Logic
   let chartData: any[] = [];
   if (data.chartData && data.chartData.length > 0) {
     chartData = data.chartData.map((item: any) => ({
@@ -74,10 +99,10 @@ export default function Dashboard() {
 
   return (
     <Shell>
-      <div className="space-y-8 pb-10">
+      <div ref={containerRef} className="space-y-8 pb-10">
         
         {/* Header */}
-        <div>
+        <div className="animate-card">
           <h1 className="text-3xl font-bold text-white mb-1">Welcome back</h1>
           <p className="text-gray-400 text-sm">Here's your financial overview</p>
         </div>
@@ -119,7 +144,7 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div>
+        <div className="animate-card">
           <h3 className="text-lg font-bold text-white mb-4">Quick Actions</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <QuickAction href="/transactions" icon={Send} label="Send Money" color="bg-purple-600" />
@@ -130,7 +155,7 @@ export default function Dashboard() {
         </div>
 
         {/* Accounts Grid */}
-        <div>
+        <div className="animate-card">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-bold text-white">Your Accounts</h3>
             <Link href="/accounts" className="text-sm text-purple-400 hover:text-purple-300">
@@ -152,7 +177,7 @@ export default function Dashboard() {
         </div>
 
         {/* Main Grid: Transactions & Chart */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-card">
           
           {/* Recent Transactions */}
           <div className="bg-[#1a1f2e] border border-gray-800 rounded-2xl p-6">
@@ -191,6 +216,7 @@ export default function Dashboard() {
                       </div>
                     </div>
                     
+                    {/* ✅ Transaction amount with proper colors */}
                     <span className={`font-bold text-sm ${
                       tx.type === 'income' ? 'text-green-500' : 'text-red-400'
                     }`}>
@@ -226,7 +252,7 @@ function StatCard({ title, value, icon: Icon, color, bgColor, trend }: any) {
   const isPositive = trend?.startsWith('+');
   
   return (
-    <div className="bg-[#1a1f2e] border border-gray-800 p-6 rounded-2xl hover:border-gray-700 transition">
+    <div className="animate-card bg-[#1a1f2e] border border-gray-800 p-6 rounded-2xl hover:border-gray-700 transition">
       <div className="flex justify-between items-start mb-4">
         <div className={`p-3 rounded-xl ${bgColor}`}>
           <Icon size={24} className={color} />
@@ -269,7 +295,6 @@ function AccountCard({ account, format }: any) {
       'crypto': { color: 'bg-orange-500/10 text-orange-500', label: 'Crypto' },
       'savings': { color: 'bg-green-500/10 text-green-500', label: 'Savings' }
     };
-    // Safe toLowerCase with fallback
     const typeKey = type ? type.toLowerCase() : 'checking';
     return icons[typeKey] || icons['checking'];
   };
