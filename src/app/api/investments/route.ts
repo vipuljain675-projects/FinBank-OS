@@ -1,25 +1,10 @@
+// app/api/investments/route.ts - COMPLETE FIXED VERSION
 import { NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/db';
 import Investment from '@/lib/models/Investment';
 import Account from '@/lib/models/Account';
 import { verifyToken } from '@/lib/auth';
-
-// --- REAL MARKET DATA FETCHER ---
-async function getLivePrice(symbol: string) {
-  try {
-    const apiKey = process.env.FINNHUB_API_KEY;
-    if (!apiKey) return null;
-
-    const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${apiKey}`);
-    if (!res.ok) return null;
-    
-    const data = await res.json();
-    return data.c && data.c > 0 ? data.c : null; 
-  } catch (error) {
-    console.error(`Failed to fetch price for ${symbol}`, error);
-    return null;
-  }
-}
+import { getCurrentPrice } from '@/lib/market';
 
 // GET: Fetch investments with LIVE calculated returns
 export async function GET(req: Request) {
@@ -35,42 +20,51 @@ export async function GET(req: Request) {
     const investments = await Investment.find({ userId: decoded.userId }).sort({ createdAt: -1 });
 
     const enrichedInvestments = await Promise.all(investments.map(async (inv) => {
-      // 1. Try to get LIVE price
-      let livePrice = await getLivePrice(inv.symbol);
+      // 1. Try to get LIVE price from market APIs
+      let livePrice = await getCurrentPrice(inv.symbol, inv.type);
       let currentPriceUSD = 0;
+      let usingLiveData = false;
 
-      // 2. 🧠 SMART LOGIC 🧠
-      if (livePrice) {
-          // CASE A: We got a live price from the API!
-          if (inv.symbol.includes('.NS') || inv.symbol.includes('.BO')) {
-              // API returns INR -> Convert to USD
-              currentPriceUSD = livePrice / 86.5;
-          } else {
-              // API returns USD -> Keep as is
-              currentPriceUSD = livePrice;
-          }
+      // 2. 🧠 SMART CONVERSION LOGIC 🧠
+      if (livePrice && livePrice > 0) {
+        usingLiveData = true;
+        
+        // Check if it's an Indian stock (API returns INR)
+        if (inv.symbol.includes('.NS') || inv.symbol.includes('.BO')) {
+          // Convert INR to USD
+          currentPriceUSD = livePrice / 86.5;
+          console.log(`💱 ${inv.symbol}: ₹${livePrice} → $${currentPriceUSD.toFixed(2)}`);
+        } else {
+          // Already in USD (US stocks, crypto)
+          currentPriceUSD = livePrice;
+          console.log(`💵 ${inv.symbol}: $${livePrice}`);
+        }
       } else {
-          // CASE B: API Failed (Market closed or Typo like TSC.NS)
-          // We must use the stored price.
-          // IMPORTANT: The stored price is ALREADY in USD. DO NOT DIVIDE IT.
-          currentPriceUSD = inv.pricePerShare; 
+        // ❌ All APIs Failed - Use stored price as fallback
+        // IMPORTANT: The stored price is ALREADY in USD
+        currentPriceUSD = inv.pricePerShare;
+        usingLiveData = false;
+        console.log(`⚠️ ${inv.symbol}: Using stored price $${currentPriceUSD} (APIs failed)`);
       }
 
       const quantity = Number(inv.quantity);
       
-      // 3. Calculate Totals (All in USD)
+      // 3. Calculate Returns (All in USD)
       const currentValue = currentPriceUSD * quantity;
       const costBasis = inv.pricePerShare * quantity; 
       
       const gainLoss = currentValue - costBasis;
       const gainLossPercent = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0;
 
+      console.log(`📊 ${inv.symbol}: Cost $${costBasis.toFixed(2)} → Current $${currentValue.toFixed(2)} = ${gainLossPercent >= 0 ? '+' : ''}${gainLossPercent.toFixed(2)}%`);
+
       return { 
         ...inv.toObject(), 
-        currentPrice: currentPriceUSD, 
+        currentPrice: currentPriceUSD,
         currentValue, 
         gainLoss,     
-        gainLossPercent   
+        gainLossPercent,
+        usingLiveData // Flag to show if data is fresh
       };
     }));
 
@@ -81,7 +75,7 @@ export async function GET(req: Request) {
   }
 }
 
-// POST: Add Investment (Kept same)
+// POST: Add Investment
 export async function POST(req: Request) {
   try {
     const authHeader = req.headers.get('Authorization');
@@ -99,32 +93,39 @@ export async function POST(req: Request) {
 
     const totalCostUSD = Number(quantity) * Number(pricePerShare);
 
+    // Check funding account has enough balance
     const fundingAccount = await Account.findOne({ _id: accountId, userId: decoded.userId });
     if (!fundingAccount || fundingAccount.balance < totalCostUSD) {
       return NextResponse.json({ message: 'Insufficient funds' }, { status: 400 });
     }
 
+    // Deduct from funding account
     await Account.findByIdAndUpdate(accountId, { $inc: { balance: -totalCostUSD } });
 
+    // Add to Investment Portfolio sync account
     await Account.findOneAndUpdate(
       { userId: decoded.userId, name: 'Investment Portfolio' },
       { $inc: { balance: totalCostUSD } },
       { upsert: true }
     );
 
+    // Create investment record
     const newInv = await Investment.create({
       userId: decoded.userId,
       symbol: symbol.toUpperCase(),
       name,
       type,
       quantity,
-      pricePerShare, 
+      pricePerShare, // Already in USD from frontend
       totalValue: totalCostUSD 
     });
+
+    console.log(`✅ Investment added: ${symbol} x${quantity} @ $${pricePerShare}`);
 
     return NextResponse.json(newInv, { status: 201 });
 
   } catch (error: any) {
+    console.error('Investment POST Error:', error);
     return NextResponse.json({ message: error.message || 'Server Error' }, { status: 500 });
   }
 }
