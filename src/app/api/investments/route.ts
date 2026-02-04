@@ -1,12 +1,12 @@
-// app/api/investments/route.ts - COMPLETE FIXED VERSION
+// app/api/investments/route.ts - COMPLETE DUAL P&L SYSTEM (Fixes TCS -0.02% vs Google -7%)
 import { NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/db';
 import Investment from '@/lib/models/Investment';
 import Account from '@/lib/models/Account';
 import { verifyToken } from '@/lib/auth';
-import { getCurrentPrice } from '@/lib/market';
+import { getCurrentPrice, getDailyChangePercent } from '@/lib/market';
 
-// GET: Fetch investments with LIVE calculated returns
+// GET: Fetch investments with LIVE calculated returns (POSITION + DAILY P&L)
 export async function GET(req: Request) {
   try {
     const authHeader = req.headers.get('Authorization');
@@ -16,11 +16,10 @@ export async function GET(req: Request) {
     if (!decoded) return NextResponse.json({ message: 'Invalid Token' }, { status: 401 });
 
     await connectToDatabase();
-    
     const investments = await Investment.find({ userId: decoded.userId }).sort({ createdAt: -1 });
 
     const enrichedInvestments = await Promise.all(investments.map(async (inv) => {
-      // 1. Try to get LIVE price from market APIs
+      // 1. Get LIVE price from market APIs
       let livePrice = await getCurrentPrice(inv.symbol, inv.type);
       let currentPriceUSD = 0;
       let usingLiveData = false;
@@ -29,42 +28,46 @@ export async function GET(req: Request) {
       if (livePrice && livePrice > 0) {
         usingLiveData = true;
         
-        // Check if it's an Indian stock (API returns INR)
+        // Indian stocks: API returns INR → Convert to USD
         if (inv.symbol.includes('.NS') || inv.symbol.includes('.BO')) {
-          // Convert INR to USD
           currentPriceUSD = livePrice / 86.5;
-          console.log(`💱 ${inv.symbol}: ₹${livePrice} → $${currentPriceUSD.toFixed(2)}`);
+          console.log(`💱 ${inv.symbol}: ₹${livePrice.toFixed(2)} → $${currentPriceUSD.toFixed(2)}`);
         } else {
-          // Already in USD (US stocks, crypto)
+          // US stocks/crypto: Already USD
           currentPriceUSD = livePrice;
-          console.log(`💵 ${inv.symbol}: $${livePrice}`);
+          console.log(`💵 ${inv.symbol}: $${livePrice.toFixed(2)}`);
         }
       } else {
-        // ❌ All APIs Failed - Use stored price as fallback
-        // IMPORTANT: The stored price is ALREADY in USD
+        // Fallback to stored price (ALREADY USD)
         currentPriceUSD = inv.pricePerShare;
         usingLiveData = false;
-        console.log(`⚠️ ${inv.symbol}: Using stored price $${currentPriceUSD} (APIs failed)`);
+        console.log(`⚠️ ${inv.symbol}: Using stored price $${currentPriceUSD.toFixed(2)}`);
       }
 
       const quantity = Number(inv.quantity);
       
-      // 3. Calculate Returns (All in USD)
-      const currentValue = currentPriceUSD * quantity;
-      const costBasis = inv.pricePerShare * quantity; 
-      
-      const gainLoss = currentValue - costBasis;
-      const gainLossPercent = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0;
+      // 3. POSITION P&L (Your actual gain/loss since purchase)
+      const currentValueUSD = currentPriceUSD * quantity;
+      const costBasisUSD = inv.pricePerShare * quantity; 
+      const positionGainLoss = currentValueUSD - costBasisUSD;
+      const positionGainLossPercent = costBasisUSD > 0 ? (positionGainLoss / costBasisUSD) * 100 : 0;
 
-      console.log(`📊 ${inv.symbol}: Cost $${costBasis.toFixed(2)} → Current $${currentValue.toFixed(2)} = ${gainLossPercent >= 0 ? '+' : ''}${gainLossPercent.toFixed(2)}%`);
+      // 🔥 4. DAILY P&L (Market change today - MATCHES GOOGLE FINANCE)
+      const dailyChangePercent = await getDailyChangePercent(inv.symbol, inv.type);
+
+      console.log(`📊 ${inv.symbol}:`);
+      console.log(`   Cost: $${costBasisUSD.toFixed(2)} → Live: $${currentValueUSD.toFixed(2)}`);
+      console.log(`   Your P&L: ${positionGainLossPercent >= 0 ? '+' : ''}${positionGainLossPercent.toFixed(2)}%`);
+      console.log(`   Daily: ${dailyChangePercent >= 0 ? '+' : ''}${dailyChangePercent.toFixed(2)}%`);
 
       return { 
-        ...inv.toObject(), 
+        ...inv.toObject(),
         currentPrice: currentPriceUSD,
-        currentValue, 
-        gainLoss,     
-        gainLossPercent,
-        usingLiveData // Flag to show if data is fresh
+        currentValue: currentValueUSD,
+        positionGainLoss,           // Your actual $ gain/loss
+        positionGainLossPercent,    // Your actual % gain/loss  
+        dailyChangePercent,         // 🔥 GOOGLE FINANCE MATCH
+        usingLiveData
       };
     }));
 
@@ -75,7 +78,7 @@ export async function GET(req: Request) {
   }
 }
 
-// POST: Add Investment
+// POST: Add Investment (UNCHANGED - WORKS PERFECTLY)
 export async function POST(req: Request) {
   try {
     const authHeader = req.headers.get('Authorization');
@@ -93,7 +96,7 @@ export async function POST(req: Request) {
 
     const totalCostUSD = Number(quantity) * Number(pricePerShare);
 
-    // Check funding account has enough balance
+    // Check funding account balance
     const fundingAccount = await Account.findOne({ _id: accountId, userId: decoded.userId });
     if (!fundingAccount || fundingAccount.balance < totalCostUSD) {
       return NextResponse.json({ message: 'Insufficient funds' }, { status: 400 });
@@ -102,7 +105,7 @@ export async function POST(req: Request) {
     // Deduct from funding account
     await Account.findByIdAndUpdate(accountId, { $inc: { balance: -totalCostUSD } });
 
-    // Add to Investment Portfolio sync account
+    // Sync Investment Portfolio account
     await Account.findOneAndUpdate(
       { userId: decoded.userId, name: 'Investment Portfolio' },
       { $inc: { balance: totalCostUSD } },
@@ -116,12 +119,11 @@ export async function POST(req: Request) {
       name,
       type,
       quantity,
-      pricePerShare, // Already in USD from frontend
+      pricePerShare, // Already USD from frontend
       totalValue: totalCostUSD 
     });
 
     console.log(`✅ Investment added: ${symbol} x${quantity} @ $${pricePerShare}`);
-
     return NextResponse.json(newInv, { status: 201 });
 
   } catch (error: any) {

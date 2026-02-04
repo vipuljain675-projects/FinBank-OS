@@ -93,39 +93,46 @@ export default function InvestmentsPage() {
 
   const handleSymbolBlur = async () => {
     if (!formData.symbol) return;
+    
     setFetchingPrice(true);
     const token = localStorage.getItem('token');
-    
     let searchSymbol = formData.symbol.toUpperCase();
 
-    // Auto-add .NS for Indian stocks
-    if (currency === 'INR' && formData.type === 'Stock' && !searchSymbol.includes('.') && searchSymbol.length < 5) {
-       searchSymbol += '.NS';
-       setFormData(prev => ({ ...prev, symbol: searchSymbol }));
+    // 🧠 Auto-add .NS for Indian stocks when in INR mode
+    if (currency === 'INR' && formData.type === 'Stock' && !searchSymbol.includes('.') && searchSymbol.length <= 5) {
+      searchSymbol = searchSymbol + '.NS';
+      setFormData(prev => ({ ...prev, symbol: searchSymbol }));
     }
 
     try {
+      console.log(`🔍 Auto-fetching ${searchSymbol}`);
       const res = await fetch(`/api/quote?symbol=${searchSymbol}&type=${formData.type}`, { 
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${token}` },
+        cache: 'no-store' // Fresh data every time
       });
       
       if (res.ok) {
         const data = await res.json();
+        console.log('✅ Quote result:', data);
+        
         if (data.price && data.price > 0) {
-           setFormData(prev => ({ 
-             ...prev, 
-             pricePerShare: data.price.toString(),
-             name: data.shortName || prev.name 
-           }));
-           
-           if (data.currency === 'INR') setInputCurrency('INR');
-           else setInputCurrency('USD');
+          setFormData(prev => ({ 
+            ...prev, 
+            pricePerShare: data.price.toString(),
+            name: data.shortName || prev.name 
+          }));
+          setInputCurrency(data.currency || 'USD');
+          
+          // 🎉 SUCCESS TOAST (Optional - add react-hot-toast)
+          console.log(`✅ ${searchSymbol}: $${data.price}`);
+        } else {
+          console.log('⚠️ No price found, manual entry required');
         }
       }
-    } catch (error) { 
-      console.error("Price fetch failed:", error); 
-    } finally { 
-      setFetchingPrice(false); 
+    } catch (error) {
+      console.error("Price fetch failed:", error);
+    } finally {
+      setFetchingPrice(false);
     }
   };
 
@@ -271,16 +278,13 @@ export default function InvestmentsPage() {
             </div>
           ) : (
             investments.map((inv) => {
-              const isPositive = inv.gainLoss >= 0;
-              const statusColor = isPositive ? '#10b981' : '#ef4444'; 
-              
               return (
                 <div 
                   key={inv._id} 
-                  className="bg-[#1a1f2e] border border-gray-800 rounded-xl p-5 flex items-center justify-between hover:border-gray-700 transition group"
+                  className="bg-[#1a1f2e] border border-gray-800 rounded-xl p-5 flex items-start lg:items-center justify-between gap-4 lg:gap-0 hover:border-gray-700 transition group"
                 >
                   {/* Logo & Info */}
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
                     <div className="w-12 h-12 bg-white rounded-lg p-1 flex items-center justify-center overflow-hidden shrink-0">
                       <img 
                         src={getLogoUrl(inv.symbol, inv.type)} 
@@ -291,9 +295,9 @@ export default function InvestmentsPage() {
                         }} 
                       />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-white font-bold text-lg">{inv.symbol}</h3>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-white font-bold text-lg truncate">{inv.symbol}</h3>
                         <span className="text-xs font-bold text-gray-500 bg-gray-900 px-2 py-0.5 rounded border border-gray-800 uppercase">
                           {inv.type}
                         </span>
@@ -310,32 +314,46 @@ export default function InvestmentsPage() {
                           </span>
                         )}
                       </div>
-                      <p className="text-gray-400 text-sm font-medium">{inv.name}</p>
+                      <p className="text-gray-400 text-sm font-medium truncate">{inv.name}</p>
                     </div>
                   </div>
 
                   {/* Holdings Info */}
-                  <div className="text-right">
+                  <div className="text-right hidden sm:block">
                     <p className="text-gray-500 text-xs uppercase font-semibold mb-1">Holdings</p>
                     <p className="text-gray-400 font-medium text-sm">{inv.quantity} Shares</p>
                     <p className="text-gray-500 text-xs">Avg Cost: {format(inv.pricePerShare)}</p>
                   </div>
 
-                  {/* Value & Actions */}
-                  <div className="flex items-center gap-8 text-right">
-                    <div>
+                  {/* NEW P&L SECTION + SELL BUTTON */}
+                  <div className="flex items-end gap-4">
+                    {/* Enhanced P&L Display */}
+                    <div className="flex flex-col gap-1 text-right">
                       <p className="text-white font-bold text-xl">{format(inv.currentValue)}</p>
-                      <div className="flex items-center justify-end gap-1 text-xs font-bold" style={{ color: statusColor }}>
-                        {isPositive ? '+' : ''}{inv.gainLossPercent?.toFixed(2)}%
+                      
+                      {/* Your Position P&L */}
+                      <div className="flex items-center justify-end gap-1 text-xs font-bold" 
+                           style={{ color: inv.positionGainLoss >= 0 ? '#10b981' : '#ef4444' }}>
+                        {inv.positionGainLossPercent >= 0 ? '+' : ''}{inv.positionGainLossPercent?.toFixed(2)}%
+                        <span className="text-gray-500 text-[10px]">(Yours)</span>
+                      </div>
+                      
+                      {/* Daily Market P&L - MATCHES GOOGLE */}
+                      <div className="flex items-center gap-1 text-xs" 
+                           style={{ color: inv.dailyChangePercent >= 0 ? '#10b981' : '#ef4444' }}>
+                        {inv.dailyChangePercent >= 0 ? '+' : ''}{inv.dailyChangePercent.toFixed(2)}% (Daily)
                       </div>
                     </div>
+
+                    {/* Sell Button */}
                     <button 
                       onClick={() => { 
                         setSellData(inv); 
                         setSellQuantity(inv.quantity); 
                         setIsSellModalOpen(true); 
                       }} 
-                      className="p-3 text-gray-500 hover:text-white hover:bg-gray-800 rounded-lg transition"
+                      className="p-3 text-gray-500 hover:text-white hover:bg-gray-800 rounded-lg transition flex-shrink-0"
+                      title="Sell"
                     >
                       <DollarSign size={20} />
                     </button>
