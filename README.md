@@ -81,3 +81,19 @@ FinBank-OS/
 │   ├── context/                # Global State (Currency INR/USD)
 │   ├── lib/                    # DB Connection & Models
 │   └── providers/              # TanStack Query Wrapper
+
+
+
+## 🚧 Challenges & Ongoing Development
+
+Building a financial OS comes with unique engineering hurdles. Here are the current technical challenges being addressed:
+
+### 1. The Stock Data Dilemma
+**The Issue:** Reliable, free stock market APIs for Indian Markets (NSE/BSE) are nearly non-existent.
+* **Finnhub/Alpha Vantage:** Provide excellent US data but strictly rate-limit free tiers (5 calls/min) and often return `null` or delayed data for Indian symbols like `RELIANCE.NS`.
+* **The Fix:** I engineered a custom **"Gateway API"** (`/api/market-data`) that bypasses standard API keys by scraping public financial data via a server-side engine. This allows the app to fetch real-time prices for **Reliance, TCS, Apple, and Bitcoin** simultaneously without crashing due to rate limits.
+
+### 2. FinBot AI Maturity
+**The Issue:** The current AI implementation is a basic iteration.
+* **Current State:** It operates on a simple retrieval-based model. While it can answer basic queries about the dashboard, it lacks deep context awareness and advanced financial reasoning.
+* **The Plan:** I am actively working on upgrading this to a specialized **LLM Agent (RAG)**. The goal is to allow it to parse complex queries like *"Analyze my spending trend over the last 3 months and suggest budget cuts,"* by giving it read-access to the user's transaction history vector database.
