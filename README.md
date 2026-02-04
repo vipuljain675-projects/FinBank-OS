@@ -1,36 +1,83 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🏦 FinBank OS
 
-## Getting Started
+**The AI-Powered Financial Operating System.**
 
-First, run the development server:
+A production-grade, full-stack financial dashboard simulating a modern banking environment. Built with **Next.js 14**, **TypeScript**, and a custom-engineered **Real-Time Market Engine**.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Live-demo link - https://fin-bank-os.vercel.app/
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🚀 Key Features
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+* **⚡ Instant Navigation:** Powered by **TanStack Query**. Experiences are cached for zero-latency navigation between Dashboard, Transactions, and Cards.
+* **📈 Custom Market Engine:** A server-side proxy API (built on `yahoo-finance2`) that scrapes real-time prices for **ALL** assets (NSE, BSE, NASDAQ, Crypto) without hitting rate limits or paywalls.
+* **🤖 FinBot AI:** Integrated AI financial assistant that provides insights on portfolio performance and spending habits.
+* **🎨 Cinematic UI:** Staggered entrance animations and dynamic "count-up" statistics powered by **GSAP** for a native-app feel.
+* **💳 Virtual Card System:** Issue virtual cards, set monthly spending limits, and toggle "Freeze/Unfreeze" states instantly.
+* **📊 Financial Analytics:** Interactive visualizations of income vs. expenses using Recharts.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## ⚠️ Simulation Disclaimer
 
-To learn more about Next.js, take a look at the following resources:
+**This application is a Financial Simulator.**
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+* **Fake Money:** All money displayed (Balances, Income, Portfolio Value) is simulated. No real funds are held or transferred.
+* **Simulated Transactions:** "Wire Transfers" and "Card Payments" perform real database operations (creating logs, updating MongoDB documents), but they do not interface with real banking networks (SWIFT/ACH).
+* **Educational Use:** This project demonstrates advanced full-stack engineering concepts (ACID transactions, real-time data fetching, caching strategies) in a sandboxed environment.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## 🏗️ Engineering Highlights
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 1. The "Unlimited" Market Data Engine
+**The Problem:** Standard free stock APIs (Finnhub, Alpha Vantage) have severe limitations:
+* Rate limits (e.g., 5 calls/minute).
+* Poor support for Indian stocks (often returning `0` or `null` for NSE symbols).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**The Solution:** I engineered a custom **Gateway API** (`/api/market-data`) that:
+1.  Accepts a batch of symbols from the frontend.
+2.  Bypasses standard API keys by scraping public finance data directly via a server-side engine.
+3.  **Result:** The dashboard displays real-time, accurate prices for **Reliance**, **TCS**, **Apple**, and **Bitcoin** simultaneously, with zero "premium" costs.
+
+### 2. High-Performance Caching
+**The Architecture:**
+Instead of `useEffect` fetching on every mount, the app uses **TanStack Query** to manage server state.
+* **Stale-While-Revalidate:** Data remains fresh for 5 minutes.
+* **Background Polling:** The portfolio page silently refreshes market prices every 10 seconds without blocking the UI.
+* **Optimistic Updates:** UI updates instantly when toggling card locks, reverting only if the server fails.
+
+---
+
+## 🛠️ Tech Stack
+
+| Category | Technologies |
+| :--- | :--- |
+| **Framework** | Next.js 14 (App Router) |
+| **Language** | TypeScript |
+| **Database** | MongoDB (Mongoose ODM) |
+| **State & Cache** | TanStack Query (React Query) |
+| **Animation** | GSAP (GreenSock) |
+| **Market Data** | Yahoo Finance 2 (Custom Implementation) |
+| **Styling** | Tailwind CSS + Lucide Icons |
+| **Auth** | JWT (Stateless Authentication) |
+
+---
+
+## 📂 Project Structure
+
+```text
+FinBank-OS/
+├── src/
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── market-data/    # 🚀 Custom Scraper Engine
+│   │   │   ├── transactions/   # Transfer Logic (Backend)
+│   │   │   └── ...
+│   │   ├── dashboard/          # Main Dashboard
+│   │   ├── investments/        # Portfolio & Live Ticker
+│   │   ├── finbot/             # 🤖 AI Assistant Page
+│   │   └── ...
+│   ├── components/             # Reusable UI Components
+│   ├── context/                # Global State (Currency INR/USD)
+│   ├── lib/                    # DB Connection & Models
+│   └── providers/              # TanStack Query Wrapper
