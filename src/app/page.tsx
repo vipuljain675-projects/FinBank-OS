@@ -1,8 +1,7 @@
-// src/app/page.tsx
 'use client';
 
 import Link from 'next/link';
-import { Wallet, ArrowRight, ShieldCheck, PieChart, Globe, Activity } from 'lucide-react';
+import { Wallet, ArrowRight, ShieldCheck, PieChart, Globe, Activity, Sparkles } from 'lucide-react';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -28,26 +27,19 @@ export default function LandingPage() {
           <span className="logo-text">FinBank</span>
         </div>
         <div className="nav-actions">
-          <Link href="/login" className="nav-link">
-            Log in
-          </Link>
-          <Link href="/register" className="nav-btn-primary">
-            Get Started
-          </Link>
+          <Link href="/login" className="nav-link">Log in</Link>
+          <Link href="/register" className="nav-btn-primary">Get Started</Link>
         </div>
       </nav>
 
       {/* --- HERO SECTION --- */}
       <main className="landing-hero">
-        
-        {/* Background Glows (CSS handled) */}
         <div className="glow-purple"></div>
         <div className="glow-blue"></div>
 
-        {/* Badge */}
         <div className="landing-badge">
           <span className="badge-dot"></span>
-          v2.0 is now live
+          v2.0 with AI Advisor is live
         </div>
 
         <h1 className="hero-title">
@@ -62,9 +54,7 @@ export default function LandingPage() {
           <Link href="/register" className="btn-hero-primary">
             Start for free <ArrowRight size={18} />
           </Link>
-          <Link href="/login" className="btn-hero-secondary">
-            Live Demo
-          </Link>
+          <Link href="/login" className="btn-hero-secondary">Live Demo</Link>
         </div>
 
         {/* Dashboard Preview */}
@@ -76,8 +66,6 @@ export default function LandingPage() {
                  </div>
                  <p>System Operational</p>
               </div>
-              
-              {/* Floating Elements */}
               <div className="float-card float-left">
                  <div className="skeleton-line w-12"></div>
                  <div className="skeleton-block"></div>
@@ -91,7 +79,6 @@ export default function LandingPage() {
               </div>
            </div>
         </div>
-
       </main>
 
       {/* --- FEATURES SECTION --- */}
@@ -107,6 +94,12 @@ export default function LandingPage() {
             title="Bank-Grade Security"
             desc="Your data is encrypted with AES-256 standards. We prioritize your privacy above everything else."
           />
+          {/* 👇 NEW FEATURE CARD ADDED */}
+          <FeatureCard 
+            icon={Sparkles}
+            title="AI Health Engine"
+            desc="Get personalized financial advice based on your spending habits, debt ratios, and portfolio health."
+          />
           <FeatureCard 
             icon={PieChart}
             title="Smart Analytics"
@@ -120,7 +113,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* --- FOOTER --- */}
       <footer className="landing-footer">
         <p>&copy; 2026 FinBank Inc. Built for the future of finance.</p>
       </footer>

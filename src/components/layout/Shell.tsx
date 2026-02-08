@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { 
   LayoutDashboard, CreditCard, PieChart, TrendingUp, 
-  LogOut, Menu, Wallet, Settings, Globe, BarChart3 
+  LogOut, Menu, Wallet, Settings, Globe, BarChart3,
+  Sparkles // 👈 Added Sparkles Import
 } from 'lucide-react';
 import { useCurrency } from '@/context/CurrencyContext'; 
 
@@ -28,6 +29,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     { name: 'Transactions', href: '/transactions', icon: PieChart },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
     { name: 'Cards', href: '/cards', icon: CreditCard },
+    // 👇 Added AI Advisor
+    { name: 'AI Advisor', href: '/advisor', icon: Sparkles },
     { name: 'FinBot AI', href: '/finbot', icon: Settings },
   ];
 
@@ -38,6 +41,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     if (pathname === '/investments') return 'Investments';
     if (pathname === '/analytics') return 'Analytics';
     if (pathname === '/cards') return 'Cards';
+    if (pathname === '/advisor') return 'AI Advisor'; // 👈 Added Title Logic
     return 'FinBank';
   };
 

@@ -1,4 +1,3 @@
-// src/lib/models/Investment.ts
 import mongoose from 'mongoose';
 
 const InvestmentSchema = new mongoose.Schema({
@@ -9,22 +8,27 @@ const InvestmentSchema = new mongoose.Schema({
   symbol: {
     type: String,
     required: true,
-    uppercase: true, // e.g., AAPL
+    uppercase: true,
   },
   name: {
     type: String,
     required: true,
   },
   type: {
-    type: String,       // <--- FIXED: Removed strict 'enum' validation
+    type: String,
     required: true,
   },
   quantity: {
     type: Number,
     required: true,
   },
-  pricePerShare: {
+  // 👇 ADD THIS FIELD! This is the missing link.
+  avgCost: {
     type: Number,
+    required: false, // Optional because old data might not have it
+  },
+  pricePerShare: {
+    type: Number, // This is usually the CURRENT price
     required: true,
   },
   totalValue: {
