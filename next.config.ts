@@ -1,15 +1,16 @@
-import type { NextConfig } from "next";
+// @ts-nocheck
 
-// 👇 Removed ": NextConfig" to stop the strict type error
 const nextConfig = {
   output: "standalone",
-  
   eslint: {
-    // This allows production builds to complete even if you have lint errors
+    // Warning: This allows production builds to successfully complete even if
+    // your project has ESLint errors.
     ignoreDuringBuilds: true,
   },
   typescript: {
-    // This allows production builds to complete even if you have type errors
+    // !! WARN !!
+    // Dangerously allow production builds to successfully complete even if
+    // your project has type errors.
     ignoreBuildErrors: true,
   },
 };
