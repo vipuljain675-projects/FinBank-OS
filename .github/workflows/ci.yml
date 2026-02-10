@@ -1,0 +1,44 @@
+name: FinBank CI/CD Pipeline
+
+# Trigger this pipeline on every push to the 'main' branch
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. Check out the code from the repo
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    # 2. Install Node.js
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    # 3. Install Dependencies
+    - name: Install Dependencies
+      run: npm ci
+
+    # 4. Run Linter (Check for code quality errors)
+    - name: Run Linting
+      run: npm run lint
+
+    # 5. Build the Project (Check for compilation errors)
+    - name: Build Project
+      run: npm run build
+      env:
+        # We need these env vars just for the build to pass validation
+        MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+
+    # 6. (Optional) Run Tests - You'd add this once you write tests
+    # - name: Run Tests
+    #   run: npm test
