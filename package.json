@@ -2,13 +2,13 @@
   "name": "finbank-next",
   "version": "0.1.0",
   "private": true,
-"scripts": {
+  "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start -H 0.0.0.0",
     "lint": "next lint",
-    "test": "jest",              
-    "test:watch": "jest --watch" 
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",
@@ -19,8 +19,8 @@
     "lucide-react": "^0.563.0",
     "mongoose": "^9.1.5",
     "next": "16.1.6",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "react-markdown": "^10.1.0",
     "recharts": "^3.7.0",
     "remark-gfm": "^4.0.1",
