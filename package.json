@@ -43,5 +43,9 @@
     "jest-environment-jsdom": "^30.2.0",
     "ts-node": "^10.9.2",
     "typescript": "^5"
+  },
+  "overrides": {
+    "react": "$react",
+    "react-dom": "$react-dom"
   }
 }
