@@ -19,7 +19,7 @@ describe('Home Page', () => {
     
     // Check if the main heading exists
     // The "i" makes it case-insensitive
-    const heading = screen.getByText(/Master your money/i)
+    const heading = screen.getByText(/Potatoes/i)
     
     expect(heading).toBeInTheDocument()
   })
