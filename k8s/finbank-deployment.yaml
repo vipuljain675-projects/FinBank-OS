@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: finbank-deployment
+  labels:
+    app: finbank
+spec:
+  replicas: 2 # 👈 This is the "Fleet" part! 2 pods for safety.
+  selector:
+    matchLabels:
+      app: finbank
+  template:
+    metadata:
+      labels:
+        app: finbank
+    spec:
+      containers:
+      - name: finbank-container
+        image: docker.io/vipuljain675/finbank-os:latest # 👈 Your image!
+        ports:
+        - containerPort: 3001
+        resources: # 👈 Add this block right here
+          requests:
+            cpu: "100m"      # Guaranteed 10% of a CPU core
+            memory: "128Mi"  # Guaranteed 128MB RAM
+          limits:
+            cpu: "500m"      # Max 50% of a CPU core
+            memory: "256Mi"  # Max 256MB RAM
+        env:
+        
+        - name: NODE_ENV
+          value: "production"
+        - name: MONGODB_URI
+          valueFrom:
+            secretKeyRef:
+              name: finbank-secrets
+              key: MONGODB_URI
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: finbank-secrets
+              key: JWT_SECRET

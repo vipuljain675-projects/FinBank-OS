@@ -50,3 +50,13 @@ infra/.terraform/
 infra/*.tfstate
 infra/*.tfstate.backup
 infra/*.tfvars
+
+# 1. Terraform - Catch-all for deep folders
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfvars
+
+# 2. Kubernetes - Crucial safety
+k8s/secrets.yaml
+**/*secret.yaml
