@@ -16,6 +16,14 @@ Live-demo link - https://fin-bank-os.vercel.app/
 * **💳 Virtual Card System:** Issue virtual cards, set monthly spending limits, and toggle "Freeze/Unfreeze" states instantly.
 * **📊 Financial Analytics:** Interactive visualizations of income vs. expenses using Recharts.
 
+
+Observability: The "FinBank Core Vitals"
+I gave my cluster "Eyes" using Prometheus to scrape system metrics and Grafana for visualization.
+
+Resource Quotas: Every pod is constrained by limits (500m CPU / 256Mi RAM) to prevent crashes.
+
+Real-time Analytics: Custom PromQL queries track pod memory usage (WSS) and CPU throttling in real-time.
+
 ---
 
 ## ⚠️ Simulation Disclaimer
@@ -47,6 +55,17 @@ Instead of `useEffect` fetching on every mount, the app uses **TanStack Query** 
 * **Background Polling:** The portfolio page silently refreshes market prices every 10 seconds without blocking the UI.
 * **Optimistic Updates:** UI updates instantly when toggling card locks, reverting only if the server fails.
 
+
+🏗️ Engineering & DevOps Highlights
+🛡️ The 7-Level Infrastructure Roadmap
+I moved beyond "just shipping code" to building a professional-grade delivery machine.
+
+Level,Phase,Implementation,Status
+L1-4,CI/CD & Testing,Dockerized MERN stack with GitHub Actions & Jest,✅
+L5,Orchestration,Kubernetes cluster with 2x replicas for high availability,✅
+L6,IaC,Terraform provisioned blueprints for environment automation,✅
+L7,Observability,"Prometheus/Grafana live-monitoring of ""Core Vitals""",✅
+L8,Cloud,AWS EKS Migration (Paused for Cost Governance/Safety),🛑
 ---
 
 ## 🛠️ Tech Stack
@@ -78,10 +97,13 @@ Building a financial OS comes with unique engineering hurdles. Here are the curr
 * **Current State:** It operates on a simple retrieval-based model. While it can answer basic queries about the dashboard, it lacks deep context awareness and advanced financial reasoning.
 * **The Plan:** I am actively working on upgrading this to a specialized **LLM Agent (RAG)**. The goal is to allow it to parse complex queries like *"Analyze my spending trend over the last 3 months and suggest budget cuts,"* by giving it read-access to the user's transaction history vector database.
 
+3. Operational Decision: AWS & Cost Governance
+The project roadmap originally included AWS EKS (Level 8). However, as a DevOps engineer, managing Cost Governance is a priority. Due to mandatory hourly fees for EKS and high verification mandates for Indian users (₹15,000), I chose to keep the production-grade orchestration hybrid/local to ensure zero-cost scalability.
+
 
 ## 📂 Project Structure
 
-```text
+```text(without devops)
 FinBank-OS/
 ├── src/
 │   ├── app/
@@ -98,6 +120,12 @@ FinBank-OS/
 │   ├── lib/                    # DB Connection & Models
 │   └── providers/              # TanStack Query Wrapper
 
-
+with devops 
+FinBank-OS/
+├── src/                # 🚀 Application Logic (Market Engine, UI, API)
+├── infra/              # 🏗️ Terraform Blueprints (.tf, .lock.hcl)
+├── k8s/                # 🚢 Kubernetes Manifests (Deployment, Service)
+├── .github/workflows/  # 🤖 CI/CD Automation
+└── DEVOPS_MANIFESTO.md # 📜 Level-by-Level Execution Guide
 
 
