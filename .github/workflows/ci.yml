@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# 👇 THE FIX: This gives the GitHub Actions bot permission to push changes back to your repo
+permissions:
+  contents: write
+
 jobs:
   # JOB 1: THE QUALITY GATE
   test:
@@ -72,11 +76,12 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
+          # Uses the default token with the 'write' permission we defined above
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update Image Tag in YAML
         run: |
-          # Fixed sed command to match your 'docker.io/' prefix exactly
+          # Matches your 'docker.io/' prefix in finbank-deployment.yaml
           sed -i "s|image: docker.io/vipuljain675/finbank-os:.*|image: docker.io/vipuljain675/finbank-os:${{ needs.build-and-push.outputs.new_tag }}|g" k8s/finbank-deployment.yaml
 
       - name: Commit and Push Manifest Change
@@ -85,7 +90,7 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add k8s/finbank-deployment.yaml
           
-          # Only commit if the file actually changed to avoid "nothing to commit" errors
+          # Only push if a change was actually made
           if git diff --quiet && git diff --staged --quiet; then
             echo "No changes to commit"
           else
