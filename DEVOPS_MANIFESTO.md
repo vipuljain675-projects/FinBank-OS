@@ -32,6 +32,17 @@ professional, automated infrastructure.
 
 ---
 
+🔄 LEVEL 8: GITOPS AUTOMATION (ARGOCD)
+Goal: Automated Deployment & Desired State Management
+
+1. Controller: ArgoCD installed in-cluster to monitor the k8s/ manifest directory.
+
+2. CI Trigger: GitHub Actions builds multi-arch images and generates a unique Commit SHA tag.
+
+3. Manifest Sync: Automated sed script updates finbank-deployment.yaml with the new SHA tag on every push.
+
+4. Auto-Reconciliation: ArgoCD detects the change and synchronizes the cluster to the new "Desired State" without manual intervention.
+
 ### ✅ STATUS: ALL SYSTEMS GREEN
 * CI/CD: GitHub Actions Verified
 * Scaling: 2 Replicas Active
