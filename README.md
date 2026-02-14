@@ -57,16 +57,17 @@ Instead of `useEffect` fetching on every mount, the app uses **TanStack Query** 
 
 
 🏗️ Engineering & DevOps Highlights
-🛡️ The 7-Level Infrastructure Roadmap
+### 🛡️ The 7-Level Infrastructure Roadmap
 I moved beyond "just shipping code" to building a professional-grade delivery machine.
 
-Level,Phase,Implementation,Status
-L1-4,CI/CD & Testing,Dockerized MERN stack with GitHub Actions & Jest,✅
-L5,Orchestration,Kubernetes cluster with 2x replicas for high availability,✅
-L6,IaC,Terraform provisioned blueprints for environment automation,✅
-L7,Observability,"Prometheus/Grafana live-monitoring of ""Core Vitals""",✅
-L8,Cloud,AWS EKS Migration (Paused for Cost Governance/Safety),🛑
----
+| Level | Phase | Implementation | Status |
+| :--- | :--- | :--- | :--- |
+| **L1-4** | **CI/CD & Testing** | Dockerized MERN stack with GitHub Actions & Jest | ✅ |
+| **L5** | **Orchestration** | **Kubernetes** cluster with 2x replicas for high availability | ✅ |
+| **L6** | **IaC** | **Terraform** provisioned blueprints for environment automation | ✅ |
+| **L7** | **Observability** | **Prometheus/Grafana** live-monitoring of "Core Vitals" | ✅ |
+| **L8** | **Cloud** | AWS EKS Migration (Paused for Cost Governance/Safety) | 🛑 |
+
 
 ## 🛠️ Tech Stack
 
