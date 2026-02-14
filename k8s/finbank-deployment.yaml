@@ -5,7 +5,7 @@ metadata:
   labels:
     app: finbank
 spec:
-  replicas: 2 # 👈 This is the "Fleet" part! 2 pods for safety.
+  replicas: 3 # 👈 This is the "Fleet" part! 2 pods for safety.
   selector:
     matchLabels:
       app: finbank
