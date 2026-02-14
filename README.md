@@ -1,4 +1,6 @@
-![FinBank CI/CD](https://github.com/vipuljain675-projects/FinBank-OS/actions/workflows/ci.yml/badge.svg)# 🏦 FinBank OS
+![FinBank CI/CD](https://github.com/vipuljain675-projects/FinBank-OS/actions/workflows/ci.yml/badge.svg)
+
+# 🏦 FinBank OS
 
 **The AI-Powered Financial Operating System.**
 
