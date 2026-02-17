@@ -5,6 +5,48 @@ professional, automated infrastructure.
 
 ---
 
+🐳 LEVEL 1: CONTAINERIZATION (DOCKER)
+ Goal: Identical execution across all environments.
+
+1. Define Blueprint: Create a Dockerfile for the Next.js app.
+
+2. Build Image: docker build -t vipuljain675/finbank-os:latest .
+
+3. Local Test: docker run -p 3001:3001 --env-file .env.local vipuljain675/finbank-os
+
+4. Cloud Storage: docker push vipuljain675/finbank-os:latest
+
+🤖 LEVEL 2: THE ROBOT (GITHUB ACTIONS CI)
+Goal: Continuous Integration on every code push.
+
+1. Automation Script: Define .github/workflows/ci.yml.
+
+2. Trigger: Every git push origin main kicks off the pipeline.
+
+3. Environment Setup: Automated Node.js 20 configuration and dependency installation.
+
+4. Docker Delivery: Automated multi-arch build (AMD64/ARM64) and push to Docker Hub.
+
+🛡️ LEVEL 3: THE QUALITY GATE (TESTING)
+Goal: Prevent bugs from reaching production.
+
+1. Test Suite: Integrated Jest for unit and integration tests.
+
+2. CI Enforcement: Pipeline stops immediately if any test fails.
+
+3. Run Command: npm test executed within the CI runner.
+
+4. Coverage: Verifying Core Financial Engine and FinBot AI logic.
+
+⚡ LEVEL 4: THE "GOD MODE" FIX (STABILITY)
+1. Goal: Handling complex dependency conflicts (React 19/Next.js 15).
+
+2. Clean Installation: Using npm ci for consistent builds in CI environments.
+
+3. Dependency Overrides: Manual package resolution in package.json to resolve conflicts.
+
+4. Strict Lock: Ensuring package-lock.json matches exactly across local and cloud builds.
+
 ### 🚢 LEVEL 5: ORCHESTRATION (KUBERNETES)
 *Goal: High Availability & Self-Healing*
 1. Start Cluster: `minikube start`
@@ -43,7 +85,11 @@ Goal: Automated Deployment & Desired State Management
 
 4. Auto-Reconciliation: ArgoCD detects the change and synchronizes the cluster to the new "Desired State" without manual intervention.
 
-### ✅ STATUS: ALL SYSTEMS GREEN
-* CI/CD: GitHub Actions Verified
-* Scaling: 2 Replicas Active
-* Limits: CPU 500m / RAM 256Mi defined
+✅ STATUS: ALL SYSTEMS GREEN
+CI/CD: GitHub Actions Verified (Test -> Build -> Push -> Update Manifest)
+
+GitOps: ArgoCD Active (Healthy & Synced)
+
+Scaling: 3 Replicas Active (Self-Healing confirmed)
+
+Limits: CPU 500m / RAM 256Mi defined per pod
