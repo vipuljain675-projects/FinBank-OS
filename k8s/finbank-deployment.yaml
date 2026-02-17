@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: finbank-container
-        image: docker.io/vipuljain675/finbank-os:32940c0
+        image: docker.io/vipuljain675/finbank-os:a58924f
         imagePullPolicy: Always # 👈 Ensures K8s always checks for new content
         ports:
         - containerPort: 3001
